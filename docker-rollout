@@ -66,6 +66,8 @@ scale() {
   local service="$1"
   local replicas="$2"
 
+  # COMPOSE_FILES must be unquoted to allow multiple files
+  # shellcheck disable=SC2086
   $COMPOSE_COMMAND $COMPOSE_FILES up --detach --scale "$service=$replicas" --no-recreate "$service"
 }
 
@@ -74,6 +76,8 @@ main() {
 
   if [[ "$OLD_CONTAINER_ID" == "" ]]; then
     echo "=> Service '$SERVICE' is not running. Starting the service."
+    # COMPOSE_FILES must be unquoted to allow multiple files
+    # shellcheck disable=SC2086
     $COMPOSE_COMMAND $COMPOSE_FILES up --detach "$SERVICE"
     exit 0
   fi
