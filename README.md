@@ -1,4 +1,7 @@
-# `docker rollout` - Zero Downtime Deployment for Docker Compose <!-- omit in toc -->
+<h1 align="center">
+<code>docker rollout</code><br>
+Zero Downtime Deployment for Docker Compose
+</h1>
 
 Docker CLI plugin to update Docker Compose services without downtime. Simply replace `docker compose up -d <name>` with `docker rollout <name>` in your deployment scripts.
 
@@ -21,8 +24,10 @@ Docker CLI plugin to update Docker Compose services without downtime. Simply rep
 ```bash
 # Create directory for Docker cli plugins
 mkdir -p ~/.docker/cli-plugins
+
 # Download docker-rollout script to Docker cli plugins directory
 curl https://raw.githubusercontent.com/wowu/docker-rollout/master/docker-rollout -o ~/.docker/cli-plugins/docker-rollout
+
 # Make the script executable
 chmod +x ~/.docker/cli-plugins/docker-rollout
 ```
@@ -55,9 +60,9 @@ Sample deployment script for `web` service:
 ```bash
 # Download latest code
 git pull
-# Build new image
+# Build new app image
 docker compose build web
-# Run migrations
+# Run database migrations
 docker compose run web rake db:migrate
 # Deploy new version
 docker rollout web
@@ -68,13 +73,11 @@ docker rollout web
 Using `docker compose up` to deploy a new version of a service causes downtime because the app container is stopped before the new container is created.
 If your application takes a while to boot, this may be noticeable to users.
 
-Using container orchestration tools like [Kubernetes](https://kubernetes.io/) or [Nomad](https://www.nomadproject.io/) is usually an overkill for projects that will do fine with a single-server Docker Compose setup.
+Using container orchestration tools like [Kubernetes](https://kubernetes.io/) or [Nomad](https://www.nomadproject.io/) is usually an overkill for projects that will do fine with a single-server Docker Compose setup. [Dokku](https://github.com/dokku/dokku) comes with zero-downtime deployment and more useful features, but it's not as flexible as Docker Compose.
 
 If you have a proxy like [Traefik](https://github.com/traefik/traefik) or [nginx-proxy](https://github.com/nginx-proxy/nginx-proxy), a zero downtime deployment can be achieved by writing a script that scales the service to 2 instances, waits for the new container to be ready, and then removes the old container.
 `docker rollout` does exactly that, but with a single command that you can use in your deployment scripts.
 If you're using Docker healthchecks, Traefik will make sure that traffic is only routed to the new container when it's ready.
-
-[Dokku](https://github.com/dokku/dokku) comes with zero-downtime deployment and more useful features, but for some projects it's not as flexible as Docker Compose.
 
 ## License
 
