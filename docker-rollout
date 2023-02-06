@@ -106,7 +106,7 @@ main() {
     fi
   else
     echo "==> Waiting for new container to be ready ($NO_HEALTHCHECK_TIMEOUT seconds)"
-    sleep $NO_HEALTHCHECK_TIMEOUT
+    sleep "$NO_HEALTHCHECK_TIMEOUT"
   fi
 
   echo "==> Stoping old container"
