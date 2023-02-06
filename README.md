@@ -10,16 +10,16 @@ Features:
 
 ## Why?
 
-Using `docker compose up` to deploy new version of a service will cause downtime, because app container will be stopped before new container is started.
-If your app takes a while to boot, this can be noticeable to users.
+Using `docker compose up` to deploy a new version of a service causes downtime because the app container is stopped before the new container is created.
+If your application takes a while to boot, this may be noticeable to users.
 
-Using container orchestration tools like Kubernetes or Nomad is usually an overkill for projects that will do fine with a single-server Docker Compose setup.
+Using container orchestration tools like [Kubernetes](https://kubernetes.io/) or [Nomad](https://www.nomadproject.io/) is usually an overkill for projects that will do fine with a single-server Docker Compose setup.
 
-If you have a proxy like Traefik or nginx-proxy, zero downtime deployment can be achieved by writing a script that scales the service to 2 instances, then stops the old container when the new one is ready.
+If you have a proxy like [Traefik](https://github.com/traefik/traefik) or [nginx-proxy](https://github.com/nginx-proxy/nginx-proxy), a zero downtime deployment can be achieved by writing a script that scales the service to 2 instances, waits for the new container to be ready, and then removes the old container.
 `docker rollout` does exactly that, but with a single command that you can use in your deployment scripts.
-If you're using Docker healthchecks, Traefik will start to route traffic to the new container only after it's ready.
+If you're using Docker healthchecks, Traefik will make sure that traffic is only routed to the new container when it's ready.
 
-Dokku comes with zero-downtime deployment and much more, but for some projects it's not as flexible as Docker Compose.
+[Dokku](https://github.com/dokku/dokku) comes with zero-downtime deployment and much more features, but for some projects it's not as flexible as Docker Compose.
 
 ## ⚠️ Caveats
 
@@ -66,4 +66,4 @@ docker rollout web
 
 ## License
 
-MIT License &copy; Karol Musur
+[MIT License](LICENSE) &copy; Karol Musur
