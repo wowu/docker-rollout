@@ -115,7 +115,6 @@ main() {
   fi
 
   echo "==> Stoping old container"
-  sleep 2
   docker stop "$OLD_CONTAINER_ID"
   docker rm "$OLD_CONTAINER_ID"
 }
