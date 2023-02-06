@@ -1,6 +1,6 @@
 # `docker rollout` - Zero Downtime Deployment for Docker Compose <!-- omit in toc -->
 
-Run `docker rollout <name>` instead of `docker compose up -d <name>` to update a service without downtime.
+Docker CLI plugin to update Docker Compose services without downtime. Simply replace `docker compose up -d <name>` with `docker rollout <name>` in your deployment scripts.
 
 - [Features](#features)
 - [Installation](#installation)
@@ -29,6 +29,8 @@ chmod +x ~/.docker/cli-plugins/docker-rollout
 
 ## Usage
 
+Run `docker rollout <name>` instead of `docker compose up -d <name>` to update a service without downtime.
+
 ```bash
 $ docker rollout -f docker-compose.yml <service-name>
 ```
@@ -44,7 +46,7 @@ Options:
 - Currently only services with scale 1 are supported
 - Your service cannot have `container_name` and `ports` defined in `docker-compose.yml`, as it's not possible to run multiple containers with the same name or port mapping
 - Proxy like Traefik or nginx-proxy is required to route traffic
-- Each deployment will increase the number in container name by 1 (e.g. `web-1` -> `web-2`)
+- Each deployment will increment the index in container name (e.g. `project-web-1` -> `project-web-2`)
 
 ### Sample deployment script
 
@@ -72,7 +74,7 @@ If you have a proxy like [Traefik](https://github.com/traefik/traefik) or [nginx
 `docker rollout` does exactly that, but with a single command that you can use in your deployment scripts.
 If you're using Docker healthchecks, Traefik will make sure that traffic is only routed to the new container when it's ready.
 
-[Dokku](https://github.com/dokku/dokku) comes with zero-downtime deployment and much more features, but for some projects it's not as flexible as Docker Compose.
+[Dokku](https://github.com/dokku/dokku) comes with zero-downtime deployment and more useful features, but for some projects it's not as flexible as Docker Compose.
 
 ## License
 
