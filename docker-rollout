@@ -116,7 +116,8 @@ main() {
 
   echo "==> Stoping old container"
   sleep 2
-  scale "$SERVICE" 1
+  docker stop "$OLD_CONTAINER_ID"
+  docker rm "$OLD_CONTAINER_ID"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -142,16 +143,20 @@ while [[ $# -gt 0 ]]; do
       exit_with_usage
       ;;
     *)
+      if [[ -n "$SERVICE" ]]; then
+        echo "SERVICE is already set to '$SERVICE'"
+        exit_with_usage
+      fi
+
       SERVICE="$1"
       shift
-      break
       ;;
   esac
 done
 
 # Require SERVICE argument
 if [[ -z "$SERVICE" ]]; then
-  echo "SERVICE is required"
+  echo "SERVICE is missing"
   exit_with_usage
 fi
 
