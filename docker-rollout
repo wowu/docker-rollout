@@ -84,6 +84,7 @@ main() {
 
   if [[ $(echo "$OLD_CONTAINER_ID" | wc -l) -gt 1 ]]; then
     echo "Service '$SERVICE' has more than one container running. Make sure 'scale' is set to 1." >&2
+    echo "Fix with: $COMPOSE_COMMAND up --detach --scale $SERVICE=1 $SERVICE" >&2
     exit 1
   fi
 
