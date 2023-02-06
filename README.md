@@ -5,7 +5,7 @@ Zero Downtime Deployment for Docker Compose
 
 Docker CLI plugin that updates Docker Compose services without downtime.
 
-Simply replace `docker compose up -d <name>` with `docker rollout <name>` in your deployment scripts. This command will scale the service to 2 instances, wait for the new container to be ready, and then remove the old container.
+Simply replace `docker compose up -d <service>` with `docker rollout <service>` in your deployment scripts. This command will scale the service to 2 instances, wait for the new container to be ready, and then remove the old container.
 
 - [Features](#features)
 - [Installation](#installation)
