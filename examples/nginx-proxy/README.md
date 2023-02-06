@@ -5,7 +5,7 @@
     ```bash
     docker-compose up -d
     ```
-3. Change `whoami` image to, for example, `jwilder/whoami`
+3. Change `whoami` image to, for example, `traefik/whoami`
 4. Deploy new version of `whoami` service without downtime
     ```bash
     docker rollout whoami
