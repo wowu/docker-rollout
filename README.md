@@ -54,7 +54,7 @@ See examples in [examples](examples) directory for sample `docker-compose.yml` f
 
 - Currently only services with scale 1 are supported.
 - Your service cannot have `container_name` and `ports` defined in `docker-compose.yml`, as it's not possible to run multiple containers with the same name or port mapping. Use a proxy as described below.
-- Proxy like [Traefik](https://github.com/traefik/traefik) or [nginx-proxy](https://github.com/nginx-proxy/nginx-proxy) is required to route traffic
+- Proxy like [Traefik](https://github.com/traefik/traefik) or [nginx-proxy](https://github.com/nginx-proxy/nginx-proxy) is required to route traffic.
 - Each deployment will increment the index in container name (e.g. `project-web-1` -> `project-web-2`).
 
 ### Sample deployment script
