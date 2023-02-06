@@ -3,7 +3,9 @@
 Zero Downtime Deployment for Docker Compose
 </h1>
 
-Docker CLI plugin to update Docker Compose services without downtime. Simply replace `docker compose up -d <name>` with `docker rollout <name>` in your deployment scripts.
+Docker CLI plugin that updates Docker Compose services without downtime.
+
+Simply replace `docker compose up -d <name>` with `docker rollout <name>` in your deployment scripts. This command will scale the service to 2 instances, wait for the new container to be ready, and then remove the old container.
 
 - [Features](#features)
 - [Installation](#installation)
@@ -50,7 +52,7 @@ Options:
 
 - Currently only services with scale 1 are supported
 - Your service cannot have `container_name` and `ports` defined in `docker-compose.yml`, as it's not possible to run multiple containers with the same name or port mapping
-- Proxy like Traefik or nginx-proxy is required to route traffic
+- Proxy like [Traefik](https://github.com/traefik/traefik) or [nginx-proxy](https://github.com/nginx-proxy/nginx-proxy) is required to route traffic
 - Each deployment will increment the index in container name (e.g. `project-web-1` -> `project-web-2`)
 
 ### Sample deployment script
