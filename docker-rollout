@@ -114,7 +114,7 @@ main() {
     sleep "$NO_HEALTHCHECK_TIMEOUT"
   fi
 
-  echo "==> Stoping old container"
+  echo "==> Stopping old container"
   docker stop "$OLD_CONTAINER_ID"
   docker rm "$OLD_CONTAINER_ID"
 }
