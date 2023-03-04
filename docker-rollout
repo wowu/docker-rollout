@@ -4,6 +4,7 @@ set -e
 # Defaults
 HEALTHCHECK_TIMEOUT=60
 NO_HEALTHCHECK_TIMEOUT=10
+SCALE=1
 
 # Print metadata for Docker CLI plugin
 if [[ "$1" == "docker-cli-plugin-metadata" ]]; then
@@ -19,9 +20,9 @@ EOF
 fi
 
 # check if compose v2 is available
-if docker compose > /dev/null 2>&1; then
+if docker compose >/dev/null 2>&1; then
   COMPOSE_COMMAND="docker compose"
-elif docker-compose > /dev/null 2>&1; then
+elif docker-compose >/dev/null 2>&1; then
   COMPOSE_COMMAND="docker-compose"
 else
   echo "docker compose or docker-compose is required"
@@ -44,6 +45,7 @@ Options:
   -t, --timeout N   Healthcheck timeout (default: $HEALTHCHECK_TIMEOUT seconds)
   -w, --wait N      When no healthcheck is defined, wait for N seconds before
                     stopping old container (default: $NO_HEALTHCHECK_TIMEOUT seconds)
+  -s  --scale N     Scale service to N instances (default: $SCALE)
 EOF
 }
 
@@ -72,84 +74,133 @@ scale() {
 }
 
 main() {
-  OLD_CONTAINER_ID=$(docker ps --filter "label=com.docker.compose.service=$SERVICE" --format "{{.ID}}")
-
-  if [[ "$OLD_CONTAINER_ID" == "" ]]; then
-    echo "=> Service '$SERVICE' is not running. Starting the service."
-    # COMPOSE_FILES must be unquoted to allow multiple files
-    # shellcheck disable=SC2086
-    $COMPOSE_COMMAND $COMPOSE_FILES up --detach "$SERVICE"
+  # shellcheck disable=SC2086
+  if ! ($COMPOSE_COMMAND $COMPOSE_FILES ps -q "$SERVICE"); then
+    echo "==> Service '$SERVICE' is not running. Starting the service."
+    $COMPOSE_COMMAND $COMPOSE_FILES up --detach --scale="$SERVICE=$SCALE" --no-recreate "$SERVICE"
     exit 0
   fi
 
-  if [[ $(echo "$OLD_CONTAINER_ID" | wc -l) -gt 1 ]]; then
-    echo "Service '$SERVICE' has more than one container running. Make sure 'scale' is set to 1." >&2
-    echo "Fix with: $COMPOSE_COMMAND up --detach --scale $SERVICE=1 $SERVICE" >&2
-    exit 1
+  # shellcheck disable=SC2086
+  if [[ "$($COMPOSE_COMMAND $COMPOSE_FILES ps -q "$SERVICE")" == "" ]]; then
+    echo "==> Service '$SERVICE' is not running. Starting the service."
+    $COMPOSE_COMMAND $COMPOSE_FILES up --detach --scale="$SERVICE=$SCALE" --no-recreate "$SERVICE"
+    exit 0
   fi
 
-  echo "==> Scaling '$SERVICE' to 2 instances"
-  scale "$SERVICE" 2
+  # COMPOSE_FILES must be unquoted to allow multiple files
+  # shellcheck disable=SC2086
+  OLD_CONTAINER_IDS_STRING=$($COMPOSE_COMMAND $COMPOSE_FILES ps -q "$SERVICE")
+  readarray -t OLD_CONTAINER_IDS <<<"$OLD_CONTAINER_IDS_STRING"
 
-  NEW_CONTAINER_ID=$(docker ps --filter "label=com.docker.compose.service=$SERVICE" --format "{{.ID}}" | grep -v "$OLD_CONTAINER_ID")
+  #  if [[ "$OLD_CONTAINER_IDS" == "" ]]; then
+  #    echo "=> Service '$SERVICE' is not running. Starting the service."
+  #     COMPOSE_FILES must be unquoted to allow multiple files
+  #     shellcheck disable=SC2086
+  #    $COMPOSE_COMMAND $COMPOSE_FILES up --detach --scale=$SCALE "$SERVICE"
+  #    exit 0
+  #  fi
+
+  #  if [[ $(echo "$OLD_CONTAINER_IDS" | wc -l) -gt 1 ]]; then
+  #    echo "Service '$SERVICE' has more than one container running. Make sure 'scale' is set to 1." >&2
+  #    echo "Fix with: $COMPOSE_COMMAND up --detach --scale $SERVICE=1 $SERVICE" >&2
+  #    exit 1
+  #  fi
+
+  SCALE_TIMES_TWO=$(($SCALE * 2))
+  echo "==> Scaling '$SERVICE' to '$SCALE_TIMES_TWO' instances"
+  scale "$SERVICE" $SCALE_TIMES_TWO
+
+  # create a variable called NEW_CONTAINER_IDS_STRING that contains the IDs of the new containers, but not the old ones
+  # shellcheck disable=SC2086
+  NEW_CONTAINER_IDS_STRING=$($COMPOSE_COMMAND $COMPOSE_FILES ps -q "$SERVICE" | grep -v -f <(echo "$OLD_CONTAINER_IDS_STRING"))
+  readarray -t NEW_CONTAINER_IDS <<<"$NEW_CONTAINER_IDS_STRING"
 
   # check if container has healthcheck
-  if docker inspect --format='{{json .State.Health}}' "$OLD_CONTAINER_ID" | grep -q "Status"; then
-    echo "==> Waiting for new container to be healthy (timeout: $HEALTHCHECK_TIMEOUT seconds)"
+  if docker inspect --format='{{json .State.Health}}' "$OLD_CONTAINER_IDS" | grep -q "Status"; then
+    echo "==> Waiting for new containers to be healthy (timeout: $HEALTHCHECK_TIMEOUT seconds)"
     for _ in $(seq 1 "$HEALTHCHECK_TIMEOUT"); do
-      # break if healthcheck is successful
-      healthcheck "$NEW_CONTAINER_ID" && break
+      SUCCESS=0
+
+      for NEW_CONTAINER_ID in "${NEW_CONTAINER_IDS[@]}"; do
+        if healthcheck "$NEW_CONTAINER_ID"; then
+          SUCCESS=$((SUCCESS + 1))
+        fi
+      done
+
+      if [ $SUCCESS -eq $SCALE ]; then
+        break
+      fi
+
       sleep 1
     done
 
-    # rollback if healthcheck is not successful after timeout
-    if ! healthcheck "$NEW_CONTAINER_ID"; then
-      echo "==> New container is not healthy. Rolling back." >&2
-      docker stop "$NEW_CONTAINER_ID"
-      docker rm "$NEW_CONTAINER_ID"
+    SUCCESS=0
+
+    for NEW_CONTAINER_ID in "${NEW_CONTAINER_IDS[@]}"; do
+      if healthcheck "$NEW_CONTAINER_ID"; then
+        SUCCESS=$((SUCCESS + 1))
+      fi
+    done
+
+    if [ $SUCCESS -ne $SCALE ]; then
+      echo "==> New containers are not healthy. Rolling back." >&2
+
+      for NEW_CONTAINER_ID in "${NEW_CONTAINER_IDS[@]}"; do
+        docker stop "$NEW_CONTAINER_ID"
+        docker rm "$NEW_CONTAINER_ID"
+      done
+
       exit 1
     fi
   else
-    echo "==> Waiting for new container to be ready ($NO_HEALTHCHECK_TIMEOUT seconds)"
+    echo "==> Waiting for new containers to be ready ($NO_HEALTHCHECK_TIMEOUT seconds)"
     sleep "$NO_HEALTHCHECK_TIMEOUT"
   fi
 
-  echo "==> Stoping old container"
-  docker stop "$OLD_CONTAINER_ID"
-  docker rm "$OLD_CONTAINER_ID"
+  echo "==> Stopping old containers"
+
+  for OLD_CONTAINER_ID in "${OLD_CONTAINER_IDS[@]}"; do
+    docker stop "$OLD_CONTAINER_ID"
+    docker rm "$OLD_CONTAINER_ID"
+  done
 }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    -h | --help)
-      usage
-      exit 0
-      ;;
-    -f | --file)
-      COMPOSE_FILES="$COMPOSE_FILES -f $2"
-      shift 2
-      ;;
-    -t | --timeout)
-      HEALTHCHECK_TIMEOUT="$2"
-      shift 2
-      ;;
-    -w | --wait)
-      NO_HEALTHCHECK_TIMEOUT="$2"
-      shift 2
-      ;;
-    -*)
-      echo "Unknown option: $1"
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  -f | --file)
+    COMPOSE_FILES="$COMPOSE_FILES -f $2"
+    shift 2
+    ;;
+  -t | --timeout)
+    HEALTHCHECK_TIMEOUT="$2"
+    shift 2
+    ;;
+  -w | --wait)
+    NO_HEALTHCHECK_TIMEOUT="$2"
+    shift 2
+    ;;
+  -s | --scale)
+    SCALE="$2"
+    shift 2
+    ;;
+  -*)
+    echo "Unknown option: $1"
+    exit_with_usage
+    ;;
+  *)
+    if [[ -n "$SERVICE" ]]; then
+      echo "SERVICE is already set to '$SERVICE'"
       exit_with_usage
-      ;;
-    *)
-      if [[ -n "$SERVICE" ]]; then
-        echo "SERVICE is already set to '$SERVICE'"
-        exit_with_usage
-      fi
+    fi
 
-      SERVICE="$1"
-      shift
-      ;;
+    SERVICE="$1"
+    shift
+    ;;
   esac
 done
 
