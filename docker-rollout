@@ -93,20 +93,6 @@ main() {
   OLD_CONTAINER_IDS_STRING=$($COMPOSE_COMMAND $COMPOSE_FILES ps -q "$SERVICE")
   readarray -t OLD_CONTAINER_IDS <<<"$OLD_CONTAINER_IDS_STRING"
 
-  #  if [[ "$OLD_CONTAINER_IDS" == "" ]]; then
-  #    echo "=> Service '$SERVICE' is not running. Starting the service."
-  #     COMPOSE_FILES must be unquoted to allow multiple files
-  #     shellcheck disable=SC2086
-  #    $COMPOSE_COMMAND $COMPOSE_FILES up --detach --scale=$SCALE "$SERVICE"
-  #    exit 0
-  #  fi
-
-  #  if [[ $(echo "$OLD_CONTAINER_IDS" | wc -l) -gt 1 ]]; then
-  #    echo "Service '$SERVICE' has more than one container running. Make sure 'scale' is set to 1." >&2
-  #    echo "Fix with: $COMPOSE_COMMAND up --detach --scale $SERVICE=1 $SERVICE" >&2
-  #    exit 1
-  #  fi
-
   SCALE_TIMES_TWO=$(($SCALE * 2))
   echo "==> Scaling '$SERVICE' to '$SCALE_TIMES_TWO' instances"
   scale "$SERVICE" $SCALE_TIMES_TWO
