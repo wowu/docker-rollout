@@ -39,11 +39,12 @@ Usage: docker rollout [OPTIONS] SERVICE
 Rollout new Compose service version.
 
 Options:
-  -h, --help        Print usage
-  -f, --file FILE   Compose configuration files
-  -t, --timeout N   Healthcheck timeout (default: $HEALTHCHECK_TIMEOUT seconds)
-  -w, --wait N      When no healthcheck is defined, wait for N seconds before
-                    stopping old container (default: $NO_HEALTHCHECK_TIMEOUT seconds)
+  -h, --help         Print usage
+  -f, --file FILE    Compose configuration files
+  -t, --timeout N    Healthcheck timeout (default: $HEALTHCHECK_TIMEOUT seconds)
+  -w, --wait N       When no healthcheck is defined, wait for N seconds before
+                     stopping old container (default: $NO_HEALTHCHECK_TIMEOUT seconds)
+  -n, --project-name Filter by docker compose project name
 EOF
 }
 
@@ -72,7 +73,12 @@ scale() {
 }
 
 main() {
-  OLD_CONTAINER_ID=$(docker ps --filter "label=com.docker.compose.service=$SERVICE" --format "{{.ID}}")
+  FILTER=""
+  if [[ ! -z "${COMPOSE_PROJECT_NAME}" ]]; then
+    FILTER="--filter label=com.docker.compose.project=${COMPOSE_PROJECT_NAME}"
+  fi
+
+  OLD_CONTAINER_ID=$(docker ps ${FILTER} --filter "label=com.docker.compose.service=${SERVICE}" --format "{{.ID}}")
 
   if [[ "$OLD_CONTAINER_ID" == "" ]]; then
     echo "=> Service '$SERVICE' is not running. Starting the service."
@@ -91,7 +97,7 @@ main() {
   echo "==> Scaling '$SERVICE' to 2 instances"
   scale "$SERVICE" 2
 
-  NEW_CONTAINER_ID=$(docker ps --filter "label=com.docker.compose.service=$SERVICE" --format "{{.ID}}" | grep -v "$OLD_CONTAINER_ID")
+  NEW_CONTAINER_ID=$(docker ps ${FILTER} --filter "label=com.docker.compose.service=${SERVICE}" --format "{{.ID}}" | grep -v "$OLD_CONTAINER_ID")
 
   # check if container has healthcheck
   if docker inspect --format='{{json .State.Health}}' "$OLD_CONTAINER_ID" | grep -q "Status"; then
@@ -135,6 +141,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     -w | --wait)
       NO_HEALTHCHECK_TIMEOUT="$2"
+      shift 2
+      ;;
+    -n | --project-name)
+      COMPOSE_PROJECT_NAME="$2"
       shift 2
       ;;
     -*)

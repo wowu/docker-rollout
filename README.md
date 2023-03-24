@@ -47,6 +47,7 @@ Options:
 - `-f | --file FILE` - (not required) - Path to compose file, can be specified multiple times, as in `docker-compose`.
 - `-t | --timeout SECONDS` - (not required) - Timeout in seconds to wait for new container to become healthy, if the container has healthcheck defined in `Dockerfile` or `docker-compose.yml`. Default: 60
 - `-w | --wait SECONDS` - (not required) - Time to wait for new container to be ready if healthcheck is not defined. Default: 10
+- `-n | --project-name NAME` - (not required) - Execute the script only for specified docker compose project
 
 See examples in [examples](examples) directory for sample `docker-compose.yml` files.
 
