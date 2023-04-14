@@ -4,6 +4,7 @@ set -e
 # Defaults
 HEALTHCHECK_TIMEOUT=60
 NO_HEALTHCHECK_TIMEOUT=10
+UPDATE_ONLY=false
 
 # Print metadata for Docker CLI plugin
 if [[ "$1" == "docker-cli-plugin-metadata" ]]; then
@@ -42,6 +43,7 @@ Options:
   -h, --help        Print usage
   -f, --file FILE   Compose configuration files
   -t, --timeout N   Healthcheck timeout (default: $HEALTHCHECK_TIMEOUT seconds)
+  -u, --update-only Deploy will only be done if image update is available
   -w, --wait N      When no healthcheck is defined, wait for N seconds before
                     stopping old container (default: $NO_HEALTHCHECK_TIMEOUT seconds)
 EOF
@@ -71,7 +73,32 @@ scale() {
   $COMPOSE_COMMAND $COMPOSE_FILES up --detach --scale "$service=$replicas" --no-recreate "$service"
 }
 
+checkForUpdates() {
+	if ! command -v jq > /dev/null 2>&1; then
+	  echo "jq is required for update-only"
+	  exit 1
+	fi
+
+	image_name=$(docker ps --filter "label=com.docker.compose.service=$SERVICE" --format "{{.Image}}")
+	container_id=$(docker ps --filter "label=com.docker.compose.service=$SERVICE" --format "{{.ID}}")
+
+	old_image_id=$(docker inspect --format='{{.Image}}' "$container_id")
+	new_image_id=$(docker manifest inspect "$image_name" | jq -r '.config.digest')
+
+	if [ "$old_image_id" != "$new_image_id" ] ; then
+		echo "=> Updating image for '$image_name' as it is outdated"
+		docker pull "$image_name"
+	else
+		echo "=> Image already up-to-date"
+		exit 0
+	fi
+}
+
 main() {
+  if $UPDATE_ONLY; then
+    checkForUpdates
+  fi
+ 
   OLD_CONTAINER_ID=$(docker ps --filter "label=com.docker.compose.service=$SERVICE" --format "{{.ID}}")
 
   if [[ "$OLD_CONTAINER_ID" == "" ]]; then
@@ -136,6 +163,10 @@ while [[ $# -gt 0 ]]; do
     -w | --wait)
       NO_HEALTHCHECK_TIMEOUT="$2"
       shift 2
+      ;;
+    -u | --update-only)
+      UPDATE_ONLY=true
+      shift	
       ;;
     -*)
       echo "Unknown option: $1"
