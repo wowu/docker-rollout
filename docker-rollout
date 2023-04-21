@@ -73,6 +73,8 @@ scale() {
 
 main() {
   # "--quiet" returns only container IDs
+  # COMPOSE_FILES must be unquoted to allow multiple files
+  # shellcheck disable=SC2086
   OLD_CONTAINER_ID=$($COMPOSE_COMMAND $COMPOSE_FILES ps --quiet "$SERVICE")
 
   if [[ "$OLD_CONTAINER_ID" == "" ]]; then
@@ -92,6 +94,8 @@ main() {
   echo "==> Scaling '$SERVICE' to 2 instances"
   scale "$SERVICE" 2
 
+  # COMPOSE_FILES must be unquoted to allow multiple files
+  # shellcheck disable=SC2086
   NEW_CONTAINER_ID=$($COMPOSE_COMMAND $COMPOSE_FILES ps --quiet "$SERVICE" | grep -v "$OLD_CONTAINER_ID")
 
   # check if container has healthcheck
