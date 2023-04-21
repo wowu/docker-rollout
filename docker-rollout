@@ -72,7 +72,8 @@ scale() {
 }
 
 main() {
-  OLD_CONTAINER_ID=$(docker ps --filter "label=com.docker.compose.service=$SERVICE" --format "{{.ID}}")
+  # "--quiet" returns only container IDs
+  OLD_CONTAINER_ID=$($COMPOSE_COMMAND $COMPOSE_FILES ps --quiet "$SERVICE")
 
   if [[ "$OLD_CONTAINER_ID" == "" ]]; then
     echo "=> Service '$SERVICE' is not running. Starting the service."
@@ -91,7 +92,7 @@ main() {
   echo "==> Scaling '$SERVICE' to 2 instances"
   scale "$SERVICE" 2
 
-  NEW_CONTAINER_ID=$(docker ps --filter "label=com.docker.compose.service=$SERVICE" --format "{{.ID}}" | grep -v "$OLD_CONTAINER_ID")
+  NEW_CONTAINER_ID=$($COMPOSE_COMMAND $COMPOSE_FILES ps --quiet "$SERVICE" | grep -v "$OLD_CONTAINER_ID")
 
   # check if container has healthcheck
   if docker inspect --format='{{json .State.Health}}' "$OLD_CONTAINER_ID" | grep -q "Status"; then
