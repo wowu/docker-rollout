@@ -4,7 +4,6 @@ set -e
 # Defaults
 HEALTHCHECK_TIMEOUT=60
 NO_HEALTHCHECK_TIMEOUT=10
-SCALE=1
 
 # Print metadata for Docker CLI plugin
 if [[ "$1" == "docker-cli-plugin-metadata" ]]; then
@@ -45,7 +44,6 @@ Options:
   -t, --timeout N   Healthcheck timeout (default: $HEALTHCHECK_TIMEOUT seconds)
   -w, --wait N      When no healthcheck is defined, wait for N seconds before
                     stopping old container (default: $NO_HEALTHCHECK_TIMEOUT seconds)
-  -s, --scale N     Scale service to N instances (default: $SCALE)
 EOF
 }
 
@@ -78,7 +76,7 @@ main() {
   # shellcheck disable=SC2086
   if [[ "$($COMPOSE_COMMAND $COMPOSE_FILES ps --quiet "$SERVICE")" == "" ]]; then
     echo "==> Service '$SERVICE' is not running. Starting the service."
-    $COMPOSE_COMMAND $COMPOSE_FILES up --detach --scale="$SERVICE=$SCALE" --no-recreate "$SERVICE"
+    $COMPOSE_COMMAND $COMPOSE_FILES up --detach --no-recreate "$SERVICE"
     exit 0
   fi
 
@@ -87,6 +85,7 @@ main() {
   OLD_CONTAINER_IDS_STRING=$($COMPOSE_COMMAND $COMPOSE_FILES ps --quiet "$SERVICE")
   readarray -t OLD_CONTAINER_IDS <<<"$OLD_CONTAINER_IDS_STRING"
 
+  SCALE=${#OLD_CONTAINER_IDS[@]}
   SCALE_TIMES_TWO=$((SCALE * 2))
   echo "==> Scaling '$SERVICE' to '$SCALE_TIMES_TWO' instances"
   scale "$SERVICE" $SCALE_TIMES_TWO
@@ -108,7 +107,7 @@ main() {
         fi
       done
 
-      if [[ "$SUCCESS" != "$SCALE" ]]; then
+      if [[ "$SUCCESS" == "$SCALE" ]]; then
         break
       fi
 
@@ -162,10 +161,6 @@ while [[ $# -gt 0 ]]; do
     ;;
   -w | --wait)
     NO_HEALTHCHECK_TIMEOUT="$2"
-    shift 2
-    ;;
-  -s | --scale)
-    SCALE="$2"
     shift 2
     ;;
   -*)
