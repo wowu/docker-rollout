@@ -45,7 +45,7 @@ Options:
   -t, --timeout N   Healthcheck timeout (default: $HEALTHCHECK_TIMEOUT seconds)
   -w, --wait N      When no healthcheck is defined, wait for N seconds before
                     stopping old container (default: $NO_HEALTHCHECK_TIMEOUT seconds)
-  -s  --scale N     Scale service to N instances (default: $SCALE)
+  -s, --scale N     Scale service to N instances (default: $SCALE)
 EOF
 }
 
@@ -76,7 +76,7 @@ scale() {
 main() {
   # COMPOSE_FILES must be unquoted to allow multiple files
   # shellcheck disable=SC2086
-  if [[ "$($COMPOSE_COMMAND $COMPOSE_FILES ps -q "$SERVICE")" == "" ]]; then
+  if [[ "$($COMPOSE_COMMAND $COMPOSE_FILES ps --quiet "$SERVICE")" == "" ]]; then
     echo "==> Service '$SERVICE' is not running. Starting the service."
     $COMPOSE_COMMAND $COMPOSE_FILES up --detach --scale="$SERVICE=$SCALE" --no-recreate "$SERVICE"
     exit 0
@@ -84,20 +84,20 @@ main() {
 
   # COMPOSE_FILES must be unquoted to allow multiple files
   # shellcheck disable=SC2086
-  OLD_CONTAINER_IDS_STRING=$($COMPOSE_COMMAND $COMPOSE_FILES ps -q "$SERVICE")
+  OLD_CONTAINER_IDS_STRING=$($COMPOSE_COMMAND $COMPOSE_FILES ps --quiet "$SERVICE")
   readarray -t OLD_CONTAINER_IDS <<<"$OLD_CONTAINER_IDS_STRING"
 
   SCALE_TIMES_TWO=$(($SCALE * 2))
   echo "==> Scaling '$SERVICE' to '$SCALE_TIMES_TWO' instances"
   scale "$SERVICE" $SCALE_TIMES_TWO
 
-  # create a variable called NEW_CONTAINER_IDS_STRING that contains the IDs of the new containers, but not the old ones
+  # create a variable that contains the IDs of the new containers, but not the old ones
   # shellcheck disable=SC2086
-  NEW_CONTAINER_IDS_STRING=$($COMPOSE_COMMAND $COMPOSE_FILES ps -q "$SERVICE" | grep -v -f <(echo "$OLD_CONTAINER_IDS_STRING"))
+  NEW_CONTAINER_IDS_STRING=$($COMPOSE_COMMAND $COMPOSE_FILES ps --quiet "$SERVICE" | grep --invert-match --file <(echo "$OLD_CONTAINER_IDS_STRING"))
   readarray -t NEW_CONTAINER_IDS <<<"$NEW_CONTAINER_IDS_STRING"
 
-  # check if container has healthcheck
-  if docker inspect --format='{{json .State.Health}}' "$OLD_CONTAINER_IDS" | grep -q "Status"; then
+  # check if first container has healthcheck
+  if docker inspect --format='{{json .State.Health}}' "$OLD_CONTAINER_IDS" | grep --quiet "Status"; then
     echo "==> Waiting for new containers to be healthy (timeout: $HEALTHCHECK_TIMEOUT seconds)"
     for _ in $(seq 1 "$HEALTHCHECK_TIMEOUT"); do
       SUCCESS=0
