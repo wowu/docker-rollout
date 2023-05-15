@@ -87,7 +87,7 @@ main() {
   OLD_CONTAINER_IDS_STRING=$($COMPOSE_COMMAND $COMPOSE_FILES ps --quiet "$SERVICE")
   readarray -t OLD_CONTAINER_IDS <<<"$OLD_CONTAINER_IDS_STRING"
 
-  SCALE_TIMES_TWO=$(($SCALE * 2))
+  SCALE_TIMES_TWO=$((SCALE * 2))
   echo "==> Scaling '$SERVICE' to '$SCALE_TIMES_TWO' instances"
   scale "$SERVICE" $SCALE_TIMES_TWO
 
@@ -97,7 +97,7 @@ main() {
   readarray -t NEW_CONTAINER_IDS <<<"$NEW_CONTAINER_IDS_STRING"
 
   # check if first container has healthcheck
-  if docker inspect --format='{{json .State.Health}}' "$OLD_CONTAINER_IDS" | grep --quiet "Status"; then
+  if docker inspect --format='{{json .State.Health}}' "${OLD_CONTAINER_IDS[0]}" | grep --quiet "Status"; then
     echo "==> Waiting for new containers to be healthy (timeout: $HEALTHCHECK_TIMEOUT seconds)"
     for _ in $(seq 1 "$HEALTHCHECK_TIMEOUT"); do
       SUCCESS=0
@@ -108,7 +108,7 @@ main() {
         fi
       done
 
-      if [ $SUCCESS -eq $SCALE ]; then
+      if [[ "$SUCCESS" != "$SCALE" ]]; then
         break
       fi
 
@@ -123,7 +123,7 @@ main() {
       fi
     done
 
-    if [ $SUCCESS -ne $SCALE ]; then
+    if [[ "$SUCCESS" != "$SCALE" ]]; then
       echo "==> New containers are not healthy. Rolling back." >&2
 
       for NEW_CONTAINER_ID in "${NEW_CONTAINER_IDS[@]}"; do
