@@ -39,12 +39,13 @@ Usage: docker rollout [OPTIONS] SERVICE
 Rollout new Compose service version.
 
 Options:
-  -h, --help        Print usage
-  -f, --file FILE   Compose configuration files
-  --env-file FILE   Specify alternate environment files
-  -t, --timeout N   Healthcheck timeout (default: $HEALTHCHECK_TIMEOUT seconds)
-  -w, --wait N      When no healthcheck is defined, wait for N seconds before
-                    stopping old container (default: $NO_HEALTHCHECK_TIMEOUT seconds)
+  -h, --help            Print usage
+  -f, --file FILE       Compose configuration files
+  -t, --timeout N       Healthcheck timeout (default: $HEALTHCHECK_TIMEOUT seconds)
+  -w, --wait N          When no healthcheck is defined, wait for N seconds
+                        before stopping old container (default: $NO_HEALTHCHECK_TIMEOUT seconds)
+      --env-file FILE   Specify an alternate environment file
+
 EOF
 }
 
