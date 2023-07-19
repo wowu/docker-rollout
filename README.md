@@ -18,7 +18,7 @@ Simply replace `docker compose up -d <service>` with `docker rollout <service>` 
 ## Features
 
 - ⏳ Zero downtime deployment for Docker Compose services
-- 🐳 Works with Docker Compose and docker-compose
+- 🐳 Works with Docker Compose and `docker-compose`
 - ❤️ Supports Docker healthchecks out of the box
 
 ## Installation
@@ -44,9 +44,10 @@ $ docker rollout -f docker-compose.yml <service-name>
 
 Options:
 
-- `-f | --file FILE` - (not required) - Path to compose file, can be specified multiple times, as in `docker-compose`.
+- `-f | --file FILE` - (not required) - Path to compose file, can be specified multiple times, as in `docker compose`.
 - `-t | --timeout SECONDS` - (not required) - Timeout in seconds to wait for new container to become healthy, if the container has healthcheck defined in `Dockerfile` or `docker-compose.yml`. Default: 60
 - `-w | --wait SECONDS` - (not required) - Time to wait for new container to be ready if healthcheck is not defined. Default: 10
+- `--env-file FILE` - (not required) - Path to env file, can be specified multiple times, as in `docker compose`.
 
 See examples in [examples](examples) directory for sample `docker-compose.yml` files.
 
