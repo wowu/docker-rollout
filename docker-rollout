@@ -57,7 +57,7 @@ exit_with_usage() {
 healthcheck() {
   local container_id="$1"
 
-  if docker inspect --format='{{json .State.Health.Status}}' "$container_id" | grep -q "healthy"; then
+  if docker inspect --format='{{json .State.Health.Status}}' "$container_id" | grep -v "unhealthy" | grep -q "healthy"; then
     return 0
   fi
 
