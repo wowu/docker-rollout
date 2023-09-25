@@ -48,6 +48,7 @@ Options:
 - `-t | --timeout SECONDS` - (not required) - Timeout in seconds to wait for new container to become healthy, if the container has healthcheck defined in `Dockerfile` or `docker-compose.yml`. Default: 60
 - `-w | --wait SECONDS` - (not required) - Time to wait for new container to be ready if healthcheck is not defined. Default: 10
 - `--env-file FILE` - (not required) - Path to env file, can be specified multiple times, as in `docker compose`.
+- `-p | --project-name NAME` - (not required) - Project name.
 
 See examples in [examples](examples) directory for sample `docker-compose.yml` files.
 
