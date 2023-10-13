@@ -18,18 +18,27 @@ EOF
   exit
 fi
 
-# check if compose v2 is available
+# Save docker arguments, i.e. arguments before "rollout"
+while [[ $# -gt 0 ]]; do
+  if [[ "$1" == "rollout" ]]; then
+    shift
+    break
+  fi
+
+  DOCKER_ARGS="$DOCKER_ARGS $1"
+  shift
+done
+
+# Check if compose v2 is available
 if docker compose >/dev/null 2>&1; then
-  COMPOSE_COMMAND="docker compose"
+  # shellcheck disable=SC2086 # DOCKER_ARGS must be unquoted to allow multiple arguments
+  COMPOSE_COMMAND="docker $DOCKER_ARGS compose"
 elif docker-compose >/dev/null 2>&1; then
   COMPOSE_COMMAND="docker-compose"
 else
   echo "docker compose or docker-compose is required"
   exit 1
 fi
-
-# Shift arguments to remove plugin name
-[[ $1 == "rollout" ]] && shift
 
 usage() {
   cat <<EOF
@@ -57,7 +66,8 @@ exit_with_usage() {
 healthcheck() {
   local container_id="$1"
 
-  if docker inspect --format='{{json .State.Health.Status}}' "$container_id" | grep -v "unhealthy" | grep -q "healthy"; then
+  # shellcheck disable=SC2086 # DOCKER_ARGS must be unquoted to allow multiple arguments
+  if docker $DOCKER_ARGS inspect --format='{{json .State.Health.Status}}' "$container_id" | grep -v "unhealthy" | grep -q "healthy"; then
     return 0
   fi
 
@@ -68,22 +78,19 @@ scale() {
   local service="$1"
   local replicas="$2"
 
-  # COMPOSE_FILES and ENV_FILES must be unquoted to allow multiple files
-  # shellcheck disable=SC2086
+  # shellcheck disable=SC2086 # COMPOSE_FILES and ENV_FILES must be unquoted to allow multiple files
   $COMPOSE_COMMAND $COMPOSE_FILES $ENV_FILES up --detach --scale "$service=$replicas" --no-recreate "$service"
 }
 
 main() {
-  # COMPOSE_FILES and ENV_FILES must be unquoted to allow multiple files
-  # shellcheck disable=SC2086
+  # shellcheck disable=SC2086 # COMPOSE_FILES and ENV_FILES must be unquoted to allow multiple files
   if [[ "$($COMPOSE_COMMAND $COMPOSE_FILES $ENV_FILES ps --quiet "$SERVICE")" == "" ]]; then
     echo "==> Service '$SERVICE' is not running. Starting the service."
     $COMPOSE_COMMAND $COMPOSE_FILES $ENV_FILES up --detach --no-recreate "$SERVICE"
     exit 0
   fi
 
-  # COMPOSE_FILES and ENV_FILES must be unquoted to allow multiple files
-  # shellcheck disable=SC2086
+  # shellcheck disable=SC2086 # COMPOSE_FILES and ENV_FILES must be unquoted to allow multiple files
   OLD_CONTAINER_IDS_STRING=$($COMPOSE_COMMAND $COMPOSE_FILES $ENV_FILES ps --quiet "$SERVICE")
   readarray -t OLD_CONTAINER_IDS <<<"$OLD_CONTAINER_IDS_STRING"
 
@@ -92,13 +99,14 @@ main() {
   echo "==> Scaling '$SERVICE' to '$SCALE_TIMES_TWO' instances"
   scale "$SERVICE" $SCALE_TIMES_TWO
 
-  # create a variable that contains the IDs of the new containers, but not the old ones
-  # shellcheck disable=SC2086
+  # Create a variable that contains the IDs of the new containers, but not the old ones
+  # shellcheck disable=SC2086 # COMPOSE_FILES and ENV_FILES must be unquoted to allow multiple files
   NEW_CONTAINER_IDS_STRING=$($COMPOSE_COMMAND $COMPOSE_FILES $ENV_FILES ps --quiet "$SERVICE" | grep --invert-match --file <(echo "$OLD_CONTAINER_IDS_STRING"))
   readarray -t NEW_CONTAINER_IDS <<<"$NEW_CONTAINER_IDS_STRING"
 
-  # check if first container has healthcheck
-  if docker inspect --format='{{json .State.Health}}' "${OLD_CONTAINER_IDS[0]}" | grep --quiet "Status"; then
+  # Check if first container has healthcheck
+  # shellcheck disable=SC2086 # DOCKER_ARGS must be unquoted to allow multiple arguments
+  if docker $DOCKER_ARGS inspect --format='{{json .State.Health}}' "${OLD_CONTAINER_IDS[0]}" | grep --quiet "Status"; then
     echo "==> Waiting for new containers to be healthy (timeout: $HEALTHCHECK_TIMEOUT seconds)"
     for _ in $(seq 1 "$HEALTHCHECK_TIMEOUT"); do
       SUCCESS=0
@@ -128,8 +136,10 @@ main() {
       echo "==> New containers are not healthy. Rolling back." >&2
 
       for NEW_CONTAINER_ID in "${NEW_CONTAINER_IDS[@]}"; do
-        docker stop "$NEW_CONTAINER_ID"
-        docker rm "$NEW_CONTAINER_ID"
+        # shellcheck disable=SC2086 # DOCKER_ARGS must be unquoted to allow multiple arguments
+        docker $DOCKER_ARGS stop "$NEW_CONTAINER_ID"
+        # shellcheck disable=SC2086 # DOCKER_ARGS must be unquoted to allow multiple arguments
+        docker $DOCKER_ARGS rm "$NEW_CONTAINER_ID"
       done
 
       exit 1
@@ -142,8 +152,10 @@ main() {
   echo "==> Stopping old containers"
 
   for OLD_CONTAINER_ID in "${OLD_CONTAINER_IDS[@]}"; do
-    docker stop "$OLD_CONTAINER_ID"
-    docker rm "$OLD_CONTAINER_ID"
+    # shellcheck disable=SC2086 # DOCKER_ARGS must be unquoted to allow multiple arguments
+    docker $DOCKER_ARGS stop "$OLD_CONTAINER_ID"
+    # shellcheck disable=SC2086 # DOCKER_ARGS must be unquoted to allow multiple arguments
+    docker $DOCKER_ARGS rm "$OLD_CONTAINER_ID"
   done
 }
 
