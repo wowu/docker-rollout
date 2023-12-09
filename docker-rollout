@@ -107,7 +107,7 @@ main() {
   NEW_CONTAINER_IDS_STRING=$($COMPOSE_COMMAND $COMPOSE_FILES $ENV_FILES ps --quiet "$SERVICE" | grep --invert-match --file <(echo "$OLD_CONTAINER_IDS_STRING"))
   NEW_CONTAINER_IDS=()
   for container_id in $NEW_CONTAINER_IDS_STRING; do
-    NEW_CONTAINER_IDS+=($container_id)
+    NEW_CONTAINER_IDS+=("$container_id")
   done
 
   # Check if first container has healthcheck
