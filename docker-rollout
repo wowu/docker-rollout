@@ -92,7 +92,10 @@ main() {
 
   # shellcheck disable=SC2086 # COMPOSE_FILES and ENV_FILES must be unquoted to allow multiple files
   OLD_CONTAINER_IDS_STRING=$($COMPOSE_COMMAND $COMPOSE_FILES $ENV_FILES ps --quiet "$SERVICE")
-  readarray -t OLD_CONTAINER_IDS <<<"$OLD_CONTAINER_IDS_STRING"
+  OLD_CONTAINER_IDS=()
+  for container_id in $OLD_CONTAINER_IDS_STRING; do
+    OLD_CONTAINER_IDS+=("$container_id")
+  done
 
   SCALE=${#OLD_CONTAINER_IDS[@]}
   SCALE_TIMES_TWO=$((SCALE * 2))
@@ -102,7 +105,10 @@ main() {
   # Create a variable that contains the IDs of the new containers, but not the old ones
   # shellcheck disable=SC2086 # COMPOSE_FILES and ENV_FILES must be unquoted to allow multiple files
   NEW_CONTAINER_IDS_STRING=$($COMPOSE_COMMAND $COMPOSE_FILES $ENV_FILES ps --quiet "$SERVICE" | grep --invert-match --file <(echo "$OLD_CONTAINER_IDS_STRING"))
-  readarray -t NEW_CONTAINER_IDS <<<"$NEW_CONTAINER_IDS_STRING"
+  NEW_CONTAINER_IDS=()
+  for container_id in $NEW_CONTAINER_IDS_STRING; do
+    NEW_CONTAINER_IDS+=("$container_id")
+  done
 
   # Check if first container has healthcheck
   # shellcheck disable=SC2086 # DOCKER_ARGS must be unquoted to allow multiple arguments
