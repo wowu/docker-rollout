@@ -94,7 +94,7 @@ main() {
   OLD_CONTAINER_IDS_STRING=$($COMPOSE_COMMAND $COMPOSE_FILES $ENV_FILES ps --quiet "$SERVICE")
   OLD_CONTAINER_IDS=()
   for container_id in $OLD_CONTAINER_IDS_STRING; do
-    OLD_CONTAINER_IDS+=($container_id)
+    OLD_CONTAINER_IDS+=("$container_id")
   done
 
   SCALE=${#OLD_CONTAINER_IDS[@]}
