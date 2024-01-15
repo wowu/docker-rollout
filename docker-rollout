@@ -177,7 +177,7 @@ while [[ $# -gt 0 ]]; do
     exit_with_usage
     ;;
   *)
-    if [[ -n "$SERVICE" ]]; then
+    if [[ -n "$SERVICE" || "$SERVICE" != "$1" ]]; then
       echo "SERVICE is already set to '$SERVICE'"
       exit_with_usage
     fi
