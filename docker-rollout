@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 set -e
 
 # Defaults
@@ -92,32 +92,24 @@ main() {
 
   # shellcheck disable=SC2086 # COMPOSE_FILES and ENV_FILES must be unquoted to allow multiple files
   OLD_CONTAINER_IDS_STRING=$($COMPOSE_COMMAND $COMPOSE_FILES $ENV_FILES ps --quiet "$SERVICE")
-  OLD_CONTAINER_IDS=()
-  for container_id in $OLD_CONTAINER_IDS_STRING; do
-    OLD_CONTAINER_IDS+=("$container_id")
-  done
-
-  SCALE=${#OLD_CONTAINER_IDS[@]}
+  OLD_CONTAINER_IDS=$(echo "$OLD_CONTAINER_IDS_STRING" | tr '\n' ' ')
+  SCALE=$(echo "$OLD_CONTAINER_IDS" | wc -w)
   SCALE_TIMES_TWO=$((SCALE * 2))
   echo "==> Scaling '$SERVICE' to '$SCALE_TIMES_TWO' instances"
   scale "$SERVICE" $SCALE_TIMES_TWO
 
   # Create a variable that contains the IDs of the new containers, but not the old ones
   # shellcheck disable=SC2086 # COMPOSE_FILES and ENV_FILES must be unquoted to allow multiple files
-  NEW_CONTAINER_IDS_STRING=$($COMPOSE_COMMAND $COMPOSE_FILES $ENV_FILES ps --quiet "$SERVICE" | grep --invert-match --file <(echo "$OLD_CONTAINER_IDS_STRING"))
-  NEW_CONTAINER_IDS=()
-  for container_id in $NEW_CONTAINER_IDS_STRING; do
-    NEW_CONTAINER_IDS+=("$container_id")
-  done
+  NEW_CONTAINER_IDS=$($COMPOSE_COMMAND $COMPOSE_FILES $ENV_FILES ps --quiet "$SERVICE" | grep -v -f <(echo "$OLD_CONTAINER_IDS_STRING") | tr '\n' ' ')
 
   # Check if first container has healthcheck
   # shellcheck disable=SC2086 # DOCKER_ARGS must be unquoted to allow multiple arguments
-  if docker $DOCKER_ARGS inspect --format='{{json .State.Health}}' "${OLD_CONTAINER_IDS[0]}" | grep --quiet "Status"; then
+  if docker $DOCKER_ARGS inspect --format='{{json .State.Health}}' "$(echo $OLD_CONTAINER_IDS | awk '{print $1}')" | grep -q "Status"; then
     echo "==> Waiting for new containers to be healthy (timeout: $HEALTHCHECK_TIMEOUT seconds)"
     for _ in $(seq 1 "$HEALTHCHECK_TIMEOUT"); do
       SUCCESS=0
 
-      for NEW_CONTAINER_ID in "${NEW_CONTAINER_IDS[@]}"; do
+      for NEW_CONTAINER_ID in $NEW_CONTAINER_IDS; do
         if healthcheck "$NEW_CONTAINER_ID"; then
           SUCCESS=$((SUCCESS + 1))
         fi
@@ -132,7 +124,7 @@ main() {
 
     SUCCESS=0
 
-    for NEW_CONTAINER_ID in "${NEW_CONTAINER_IDS[@]}"; do
+    for NEW_CONTAINER_ID in $NEW_CONTAINER_IDS; do
       if healthcheck "$NEW_CONTAINER_ID"; then
         SUCCESS=$((SUCCESS + 1))
       fi
@@ -141,12 +133,8 @@ main() {
     if [[ "$SUCCESS" != "$SCALE" ]]; then
       echo "==> New containers are not healthy. Rolling back." >&2
 
-      for NEW_CONTAINER_ID in "${NEW_CONTAINER_IDS[@]}"; do
-        # shellcheck disable=SC2086 # DOCKER_ARGS must be unquoted to allow multiple arguments
-        docker $DOCKER_ARGS stop "$NEW_CONTAINER_ID"
-        # shellcheck disable=SC2086 # DOCKER_ARGS must be unquoted to allow multiple arguments
-        docker $DOCKER_ARGS rm "$NEW_CONTAINER_ID"
-      done
+      docker $DOCKER_ARGS stop $NEW_CONTAINER_IDS
+      docker $DOCKER_ARGS rm $NEW_CONTAINER_IDS
 
       exit 1
     fi
@@ -155,14 +143,11 @@ main() {
     sleep "$NO_HEALTHCHECK_TIMEOUT"
   fi
 
-  echo "==> Stopping old containers"
+  echo "==> Stopping and removing old containers"
 
-  for OLD_CONTAINER_ID in "${OLD_CONTAINER_IDS[@]}"; do
-    # shellcheck disable=SC2086 # DOCKER_ARGS must be unquoted to allow multiple arguments
-    docker $DOCKER_ARGS stop "$OLD_CONTAINER_ID"
-    # shellcheck disable=SC2086 # DOCKER_ARGS must be unquoted to allow multiple arguments
-    docker $DOCKER_ARGS rm "$OLD_CONTAINER_ID"
-  done
+  # shellcheck disable=SC2086 # DOCKER_ARGS and OLD_CONTAINER_IDS must be unquoted to allow multiple arguments
+  docker $DOCKER_ARGS stop $OLD_CONTAINER_IDS
+  docker $DOCKER_ARGS rm $OLD_CONTAINER_IDS
 }
 
 while [[ $# -gt 0 ]]; do
