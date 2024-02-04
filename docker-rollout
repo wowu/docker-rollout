@@ -6,7 +6,7 @@ HEALTHCHECK_TIMEOUT=60
 NO_HEALTHCHECK_TIMEOUT=10
 
 # Print metadata for Docker CLI plugin
-if [[ "$1" == "docker-cli-plugin-metadata" ]]; then
+if [ "$1" = "docker-cli-plugin-metadata" ]; then
   cat <<EOF
 {
   "SchemaVersion": "0.1.0",
@@ -19,8 +19,8 @@ EOF
 fi
 
 # Save docker arguments, i.e. arguments before "rollout"
-while [[ $# -gt 0 ]]; do
-  if [[ "$1" == "rollout" ]]; then
+while [ $# -gt 0 ]; do
+  if [ "$1" = "rollout" ]; then
     shift
     break
   fi
@@ -64,10 +64,8 @@ exit_with_usage() {
 }
 
 healthcheck() {
-  local container_id="$1"
-
   # shellcheck disable=SC2086 # DOCKER_ARGS must be unquoted to allow multiple arguments
-  if docker $DOCKER_ARGS inspect --format='{{json .State.Health.Status}}' "$container_id" | grep -v "unhealthy" | grep -q "healthy"; then
+  if docker $DOCKER_ARGS inspect --format='{{json .State.Health.Status}}' "$1" | grep -v "unhealthy" | grep -q "healthy"; then
     return 0
   fi
 
@@ -75,24 +73,21 @@ healthcheck() {
 }
 
 scale() {
-  local service="$1"
-  local replicas="$2"
-
   # shellcheck disable=SC2086 # COMPOSE_FILES and ENV_FILES must be unquoted to allow multiple files
-  $COMPOSE_COMMAND $COMPOSE_FILES $ENV_FILES up --detach --scale "$service=$replicas" --no-recreate "$service"
+  $COMPOSE_COMMAND $COMPOSE_FILES $ENV_FILES up --detach --scale "$1=$2" --no-recreate "$1"
 }
 
 main() {
   # shellcheck disable=SC2086 # COMPOSE_FILES and ENV_FILES must be unquoted to allow multiple files
-  if [[ "$($COMPOSE_COMMAND $COMPOSE_FILES $ENV_FILES ps --quiet "$SERVICE")" == "" ]]; then
+  if [ -z "$($COMPOSE_COMMAND $COMPOSE_FILES $ENV_FILES ps --quiet "$SERVICE")" ]; then
     echo "==> Service '$SERVICE' is not running. Starting the service."
     $COMPOSE_COMMAND $COMPOSE_FILES $ENV_FILES up --detach --no-recreate "$SERVICE"
     exit 0
   fi
 
   # shellcheck disable=SC2086 # COMPOSE_FILES and ENV_FILES must be unquoted to allow multiple files
-  OLD_CONTAINER_IDS_STRING=$($COMPOSE_COMMAND $COMPOSE_FILES $ENV_FILES ps --quiet "$SERVICE")
-  OLD_CONTAINER_IDS=$(echo "$OLD_CONTAINER_IDS_STRING" | tr '\n' ' ')
+  OLD_CONTAINER_IDS_STRING=$($COMPOSE_COMMAND $COMPOSE_FILES $ENV_FILES ps --quiet "$SERVICE" | tr '\n' '|')
+  OLD_CONTAINER_IDS=$(echo "$OLD_CONTAINER_IDS_STRING" | tr '|' ' ')
   SCALE=$(echo "$OLD_CONTAINER_IDS" | wc -w)
   SCALE_TIMES_TWO=$((SCALE * 2))
   echo "==> Scaling '$SERVICE' to '$SCALE_TIMES_TWO' instances"
@@ -100,7 +95,7 @@ main() {
 
   # Create a variable that contains the IDs of the new containers, but not the old ones
   # shellcheck disable=SC2086 # COMPOSE_FILES and ENV_FILES must be unquoted to allow multiple files
-  NEW_CONTAINER_IDS=$($COMPOSE_COMMAND $COMPOSE_FILES $ENV_FILES ps --quiet "$SERVICE" | grep -v -f <(echo "$OLD_CONTAINER_IDS_STRING") | tr '\n' ' ')
+  NEW_CONTAINER_IDS=$($COMPOSE_COMMAND $COMPOSE_FILES $ENV_FILES ps --quiet "$SERVICE" | grep -Ev "$OLD_CONTAINER_IDS_STRING" | tr '\n' ' ')
 
   # Check if first container has healthcheck
   # shellcheck disable=SC2086 # DOCKER_ARGS must be unquoted to allow multiple arguments
@@ -115,7 +110,7 @@ main() {
         fi
       done
 
-      if [[ "$SUCCESS" == "$SCALE" ]]; then
+      if [ "$SUCCESS" = "$SCALE" ]; then
         break
       fi
 
@@ -130,7 +125,7 @@ main() {
       fi
     done
 
-    if [[ "$SUCCESS" != "$SCALE" ]]; then
+    if [ "$SUCCESS" != "$SCALE" ]; then
       echo "==> New containers are not healthy. Rolling back." >&2
 
       docker $DOCKER_ARGS stop $NEW_CONTAINER_IDS
@@ -147,10 +142,11 @@ main() {
 
   # shellcheck disable=SC2086 # DOCKER_ARGS and OLD_CONTAINER_IDS must be unquoted to allow multiple arguments
   docker $DOCKER_ARGS stop $OLD_CONTAINER_IDS
+  # shellcheck disable=SC2086 # DOCKER_ARGS and OLD_CONTAINER_IDS must be unquoted to allow multiple arguments
   docker $DOCKER_ARGS rm $OLD_CONTAINER_IDS
 }
 
-while [[ $# -gt 0 ]]; do
+while [ $# -gt 0 ]; do
   case "$1" in
   -h | --help)
     usage
@@ -177,7 +173,7 @@ while [[ $# -gt 0 ]]; do
     exit_with_usage
     ;;
   *)
-    if [[ -n "$SERVICE" || "$SERVICE" != "$1" ]]; then
+    if [ -n "$SERVICE" ] || [ "$SERVICE" != "$1" ]; then
       echo "SERVICE is already set to '$SERVICE'"
       exit_with_usage
     fi
@@ -189,7 +185,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Require SERVICE argument
-if [[ -z "$SERVICE" ]]; then
+if [ -z "$SERVICE" ]; then
   echo "SERVICE is missing"
   exit_with_usage
 fi
