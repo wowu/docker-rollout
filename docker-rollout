@@ -86,7 +86,7 @@ main() {
   fi
 
   # shellcheck disable=SC2086 # COMPOSE_FILES and ENV_FILES must be unquoted to allow multiple files
-  OLD_CONTAINER_IDS_STRING=$($COMPOSE_COMMAND $COMPOSE_FILES $ENV_FILES ps --quiet "$SERVICE" | tr '\n' '|')
+  OLD_CONTAINER_IDS_STRING=$($COMPOSE_COMMAND $COMPOSE_FILES $ENV_FILES ps --quiet "$SERVICE" | tr '\n' '|' | sed 's/|$//')
   OLD_CONTAINER_IDS=$(echo "$OLD_CONTAINER_IDS_STRING" | tr '|' ' ')
   SCALE=$(echo "$OLD_CONTAINER_IDS" | wc -w)
   SCALE_TIMES_TWO=$((SCALE * 2))
@@ -173,9 +173,11 @@ while [ $# -gt 0 ]; do
     exit_with_usage
     ;;
   *)
-    if [ -n "$SERVICE" ] || [ "$SERVICE" != "$1" ]; then
+    if [ -n "$SERVICE" ]; then
       echo "SERVICE is already set to '$SERVICE'"
-      exit_with_usage
+	  if [ "$SERVICE" != "$1" ]; then
+        exit_with_usage
+	  fi
     fi
 
     SERVICE="$1"
