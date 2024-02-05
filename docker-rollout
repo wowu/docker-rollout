@@ -65,11 +65,7 @@ exit_with_usage() {
 
 healthcheck() {
   # shellcheck disable=SC2086 # DOCKER_ARGS must be unquoted to allow multiple arguments
-  if docker $DOCKER_ARGS inspect --format='{{json .State.Health.Status}}' "$1" | grep -v "unhealthy" | grep -q "healthy"; then
-    return 0
-  fi
-
-  return 1
+  return $(docker $DOCKER_ARGS inspect --format='{{json .State.Health.Status}}' "$1" | grep -v "unhealthy" | grep -q "healthy")
 }
 
 scale() {
@@ -88,7 +84,7 @@ main() {
   # shellcheck disable=SC2086 # COMPOSE_FILES and ENV_FILES must be unquoted to allow multiple files
   OLD_CONTAINER_IDS_STRING=$($COMPOSE_COMMAND $COMPOSE_FILES $ENV_FILES ps --quiet "$SERVICE" | tr '\n' '|' | sed 's/|$//')
   OLD_CONTAINER_IDS=$(echo "$OLD_CONTAINER_IDS_STRING" | tr '|' ' ')
-  SCALE=$(echo "$OLD_CONTAINER_IDS" | wc -w)
+  SCALE=$(echo "$OLD_CONTAINER_IDS" | wc -w | tr -d ' ')
   SCALE_TIMES_TWO=$((SCALE * 2))
   echo "==> Scaling '$SERVICE' to '$SCALE_TIMES_TWO' instances"
   scale "$SERVICE" $SCALE_TIMES_TWO
@@ -99,7 +95,7 @@ main() {
 
   # Check if first container has healthcheck
   # shellcheck disable=SC2086 # DOCKER_ARGS must be unquoted to allow multiple arguments
-  if docker $DOCKER_ARGS inspect --format='{{json .State.Health}}' "$(echo $OLD_CONTAINER_IDS | awk '{print $1}')" | grep -q "Status"; then
+  if docker $DOCKER_ARGS inspect --format='{{json .State.Health}}' "$(echo $OLD_CONTAINER_IDS | cut -f 1 -w)" | grep -q "Status"; then
     echo "==> Waiting for new containers to be healthy (timeout: $HEALTHCHECK_TIMEOUT seconds)"
     for _ in $(seq 1 "$HEALTHCHECK_TIMEOUT"); do
       SUCCESS=0
