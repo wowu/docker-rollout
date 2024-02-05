@@ -65,7 +65,7 @@ exit_with_usage() {
 
 healthcheck() {
   # shellcheck disable=SC2086 # DOCKER_ARGS must be unquoted to allow multiple arguments
-  return $(docker $DOCKER_ARGS inspect --format='{{json .State.Health.Status}}' "$1" | grep -v "unhealthy" | grep -q "healthy")
+  docker $DOCKER_ARGS inspect --format='{{json .State.Health.Status}}' "$1" | grep -v "unhealthy" | grep -q "healthy"
 }
 
 scale() {
