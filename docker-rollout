@@ -95,7 +95,7 @@ main() {
 
   # Check if first container has healthcheck
   # shellcheck disable=SC2086 # DOCKER_ARGS must be unquoted to allow multiple arguments
-  if docker $DOCKER_ARGS inspect --format='{{json .State.Health}}' "$(echo $OLD_CONTAINER_IDS | cut -f 1 -w)" | grep -q "Status"; then
+  if docker $DOCKER_ARGS inspect --format='{{json .State.Health}}' "$(echo $OLD_CONTAINER_IDS | cut -d\  -f 1)" | grep -q "Status"; then
     echo "==> Waiting for new containers to be healthy (timeout: $HEALTHCHECK_TIMEOUT seconds)"
     for _ in $(seq 1 "$HEALTHCHECK_TIMEOUT"); do
       SUCCESS=0
