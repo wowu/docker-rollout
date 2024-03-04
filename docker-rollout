@@ -171,9 +171,10 @@ while [ $# -gt 0 ]; do
   *)
     if [ -n "$SERVICE" ]; then
       echo "SERVICE is already set to '$SERVICE'"
-	  if [ "$SERVICE" != "$1" ]; then
+
+      if [ "$SERVICE" != "$1" ]; then
         exit_with_usage
-	  fi
+      fi
     fi
 
     SERVICE="$1"
