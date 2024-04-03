@@ -12,7 +12,7 @@ if [ "$1" = "docker-cli-plugin-metadata" ]; then
 {
   "SchemaVersion": "0.1.0",
   "Vendor": "Karol Musur",
-  "Version": "v0.8",
+  "Version": "v0.9",
   "ShortDescription": "Rollout new Compose service version"
 }
 EOF
