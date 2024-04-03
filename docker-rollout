@@ -131,7 +131,9 @@ main() {
       docker $DOCKER_ARGS rm $NEW_CONTAINER_IDS
 
       exit 1
-    elif [ "$WAIT_AFTER_HEALTHY_DELAY" != "0" ]; then
+    fi
+    
+    if [ "$WAIT_AFTER_HEALTHY_DELAY" != "0" ]; then
       echo "==> Waiting for healthy containers to settle down ($WAIT_AFTER_HEALTHY_DELAY seconds)"
       sleep $WAIT_AFTER_HEALTHY_DELAY
     fi
