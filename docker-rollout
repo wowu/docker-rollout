@@ -4,6 +4,7 @@ set -e
 # Defaults
 HEALTHCHECK_TIMEOUT=60
 NO_HEALTHCHECK_TIMEOUT=10
+WAIT_AFTER_HEALTHY_DELAY=0
 
 # Print metadata for Docker CLI plugin
 if [ "$1" = "docker-cli-plugin-metadata" ]; then
@@ -48,12 +49,14 @@ Usage: docker rollout [OPTIONS] SERVICE
 Rollout new Compose service version.
 
 Options:
-  -h, --help            Print usage
-  -f, --file FILE       Compose configuration files
-  -t, --timeout N       Healthcheck timeout (default: $HEALTHCHECK_TIMEOUT seconds)
-  -w, --wait N          When no healthcheck is defined, wait for N seconds
-                        before stopping old container (default: $NO_HEALTHCHECK_TIMEOUT seconds)
-      --env-file FILE   Specify an alternate environment file
+  -h, --help                  Print usage
+  -f, --file FILE             Compose configuration files
+  -t, --timeout N             Healthcheck timeout (default: $HEALTHCHECK_TIMEOUT seconds)
+  -w, --wait N                When no healthcheck is defined, wait for N seconds
+                              before stopping old container (default: $NO_HEALTHCHECK_TIMEOUT seconds)
+      --wait-after-healthy N  When healthcheck is defined and succeeds, wait for additional N seconds
+                              before stopping the old container (default: 0 seconds)
+      --env-file FILE         Specify an alternate environment file
 
 EOF
 }
@@ -129,6 +132,11 @@ main() {
 
       exit 1
     fi
+    
+    if [ "$WAIT_AFTER_HEALTHY_DELAY" != "0" ]; then
+      echo "==> Waiting for healthy containers to settle down ($WAIT_AFTER_HEALTHY_DELAY seconds)"
+      sleep $WAIT_AFTER_HEALTHY_DELAY
+    fi
   else
     echo "==> Waiting for new containers to be ready ($NO_HEALTHCHECK_TIMEOUT seconds)"
     sleep "$NO_HEALTHCHECK_TIMEOUT"
@@ -162,6 +170,10 @@ while [ $# -gt 0 ]; do
     ;;
   -w | --wait)
     NO_HEALTHCHECK_TIMEOUT="$2"
+    shift 2
+    ;;
+  --wait-after-healthy)
+    WAIT_AFTER_HEALTHY_DELAY="$2"
     shift 2
     ;;
   -*)
