@@ -47,6 +47,7 @@ Options:
 - `-f | --file FILE` - (not required) - Path to compose file, can be specified multiple times, as in `docker compose`.
 - `-t | --timeout SECONDS` - (not required) - Timeout in seconds to wait for new container to become healthy, if the container has healthcheck defined in `Dockerfile` or `docker-compose.yml`. Default: 60
 - `-w | --wait SECONDS` - (not required) - Time to wait for new container to be ready if healthcheck is not defined. Default: 10
+- `--wait-after-healthy SECONDS` - (not required) - Time to wait after new container is healthy before removing old container. Works when healthcheck is defined. Default: 0
 - `--env-file FILE` - (not required) - Path to env file, can be specified multiple times, as in `docker compose`.
 
 See examples in [examples](examples) directory for sample `docker-compose.yml` files.
