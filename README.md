@@ -32,6 +32,12 @@ curl https://raw.githubusercontent.com/wowu/docker-rollout/master/docker-rollout
 
 # Make the script executable
 chmod +x ~/.docker/cli-plugins/docker-rollout
+
+# Add user to docker group
+sudo usermod -aG docker $USER
+
+# Refresh group
+newgrp docker
 ```
 
 ## Usage
