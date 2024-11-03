@@ -36,7 +36,7 @@ chmod +x ~/.docker/cli-plugins/docker-rollout
 
 ## Usage
 
-Run `docker rollout <name>` instead of `docker compose up -d <name>` to update a service without downtime.
+Run `docker rollout <name>` instead of `docker compose up -d <name>` to update a service without downtime. If you have both `docker compose` plugin and `docker-compose` command available, docker-rollout will use `docker compose` by default.
 
 ```bash
 $ docker rollout -f docker-compose.yml <service-name>
