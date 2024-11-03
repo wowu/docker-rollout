@@ -1,0 +1,24 @@
+services:
+  whoami:
+    build: .
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.whoami.entrypoints=web"
+      - "traefik.http.routers.whoami.rule=Host(`example.com`)"
+    healthcheck:
+      test: ["CMD", "test", "!", "-f", "/tmp/drain"]
+      interval: 5s
+      retries: 1
+  traefik:
+    image: traefik:v2.9
+    container_name: traefik
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+    ports:
+      - "9080:80"
+      - "9088:8080"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
