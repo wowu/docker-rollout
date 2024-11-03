@@ -78,7 +78,7 @@ docker rollout web
 
 ### True zero-downtime deployment with request draining
 
-If you want to make sure that no requests are lost during deployment, you can use the following setup to implement request draining. It requires adding a healthcheck to your container that will be made failing on purpose when performing rollout to make proxy (Traefik or nginx-proxy) stop sending requests to the old container before it's removed.
+If you want to make sure that no requests are lost during deployment, you can use the following setup to implement request draining. It requires adding a healthcheck to your container that will be made failing on purpose when performing rollout to the make proxy (Traefik or nginx-proxy) stop sending requests to the old container before it's removed.
 
 1. Add additional healthcheck to your container. The check should fail when `/tmp/drain` file is present.
 
@@ -112,9 +112,9 @@ If you want to make sure that no requests are lost during deployment, you can us
    docker rollout web --pre-stop-hook "touch /tmp/drain && sleep 10"
    ```
 
-   **Important:** make sure the sleep time is longer than the healthcheck `interval` × `retries` + time to finish processing open requests (e.g. `interval: 10s`, `retries: 3`, additional time of 5s = `sleep 35`) so the healthcheck has enough time to mark the container as unhealthy.
+   **Important:** make sure the sleep time is longer than the healthcheck `interval` × `retries` + `time to finish processing open requests` (e.g. interval: 10s, retries: 3, additional time of 5s = sleep 35) so the healthcheck has enough time to mark the container as unhealthy.
 
-With this configuration, a rollout process will look like this:
+With this configuration, a rollout process looks like this:
 
 1. New container is started.
 2. Docker daemon marks the old container as healthy.
