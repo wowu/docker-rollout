@@ -1,35 +1,45 @@
-<h1 align="center">
-<code>docker rollout</code><br>
-Zero Downtime Deployment for Docker Compose
-</h1>
+---
+title: Home
+nav_order: 1
+---
 
-Docker CLI plugin that updates Docker Compose services without downtime.
+# docker rollout - Docker CLI plugin for updating Docker Compose services without downtime
 
-Simply replace `docker compose up -d <service>` with `docker rollout <service>` in your deployment scripts. This command will scale the service to twice the current number of instances, wait for the new containers to be ready, and then remove the old containers.
+Simply replace `docker compose up -d <service>` with `docker rollout <service>` in your deployment scripts to update a service without downtime.
+{: .fs-5 .fw-300 }
 
-- [Features](#features)
-- [Installation](#installation)
-- [Usage](#usage)
-  - [⚠️ Caveats](#️-caveats)
-  - [Sample deployment script](#sample-deployment-script)
-- [Why?](#why)
-- [License](#license)
+[Get started](#installation){: .btn .btn-primary .fs-5 .mb-4 .mb-md-0 .mr-2 }
+[View on GitHub](https://github.com/wowu/docker-rollout){: .btn .fs-5 .mb-4 .mb-md-0}
 
 ## Features
 
 - ⏳ Zero downtime deployment for Docker Compose services
-- 🐳 Works with Docker Compose and `docker-compose`
+- 🐳 Works with Docker Compose v2 and `docker-compose` v1 ([What's the difference?](docker_compose_versions))
 - ❤️ Supports Docker healthchecks out of the box
 
+## How does it work?
+
+This command will scale the service to twice the current number of instances, wait for the new containers to be ready, and then remove the old containers.
+
+## Why is it useful?
+
+Using `docker compose up` to deploy a new version of a service causes downtime because the app container is stopped before the new container is created. If your application takes a while to boot, this may be noticeable to your users.
+
+## Caveats (⚠️ read before using)
+
+- Your service cannot have `container_name` and `ports` defined in `docker-compose.yml`, as it's not possible to run multiple containers with the same name or port mapping. Use a proxy as described below.
+- Proxy like [Traefik](https://github.com/traefik/traefik) or [nginx-proxy](https://github.com/nginx-proxy/nginx-proxy) is required to route traffic to the containers. Refer to the [Examples](examples) for sample compose files.
+- Each deployment will increment the index in container name (e.g. `project-web-1` -> `project-web-2`).
+
 ## Installation
+
+Quick install:
 
 ```bash
 # Create directory for Docker cli plugins
 mkdir -p ~/.docker/cli-plugins
-
 # Download docker-rollout script to Docker cli plugins directory
 curl https://raw.githubusercontent.com/wowu/docker-rollout/master/docker-rollout -o ~/.docker/cli-plugins/docker-rollout
-
 # Make the script executable
 chmod +x ~/.docker/cli-plugins/docker-rollout
 ```
@@ -39,24 +49,10 @@ chmod +x ~/.docker/cli-plugins/docker-rollout
 Run `docker rollout <name>` instead of `docker compose up -d <name>` to update a service without downtime. If you have both `docker compose` plugin and `docker-compose` command available, docker-rollout will use `docker compose` by default.
 
 ```bash
-$ docker rollout -f docker-compose.yml <service-name>
+docker rollout -f docker-compose.yml <service-name>
 ```
 
-Options:
-
-- `-f | --file FILE` - (not required) - Path to compose file, can be specified multiple times, as in `docker compose`.
-- `-t | --timeout SECONDS` - (not required) - Timeout in seconds to wait for new container to become healthy, if the container has healthcheck defined in `Dockerfile` or `docker-compose.yml`. Default: 60
-- `-w | --wait SECONDS` - (not required) - Time to wait for new container to be ready if healthcheck is not defined. Default: 10
-- `--wait-after-healthy SECONDS` - (not required) - Time to wait after new container is healthy before removing old container. Works when healthcheck is defined. Default: 0
-- `--env-file FILE` - (not required) - Path to env file, can be specified multiple times, as in `docker compose`.
-
-See [examples](docs/examples) for sample `docker-compose.yml` files.
-
-### ⚠️ Caveats
-
-- Your service cannot have `container_name` and `ports` defined in `docker-compose.yml`, as it's not possible to run multiple containers with the same name or port mapping. Use a proxy as described below.
-- Proxy like [Traefik](https://github.com/traefik/traefik) or [nginx-proxy](https://github.com/nginx-proxy/nginx-proxy) is required to route traffic.
-- Each deployment will increment the index in container name (e.g. `project-web-1` -> `project-web-2`).
+You can read read more about the setup in [Getting Started](getting-started), see [available cli options](cli-options), and check out some [examples](examples).
 
 ### Sample deployment script
 
@@ -73,7 +69,7 @@ docker compose run web rake db:migrate
 docker rollout web
 ```
 
-## Why?
+## Rationale and alternatives
 
 Using `docker compose up` to deploy a new version of a service causes downtime because the app container is stopped before the new container is created.
 If your application takes a while to boot, this may be noticeable to users.
@@ -86,4 +82,5 @@ If you're using Docker healthchecks, Traefik will make sure that traffic is only
 
 ## License
 
-[MIT License](LICENSE) &copy; Karol Musur
+[MIT License](https://github.com/wowu/docker-rollout/blob/main/LICENSE) &copy; Karol Musur
+

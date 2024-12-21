@@ -1,0 +1,22 @@
+title: docker rollout
+description: 🚀 Zero Downtime Deployment for Docker Compose.
+theme: just-the-docs
+url: https://docker-rollout.wowu.dev
+
+# just-the-docs theme config
+aux_links:
+  GitHub Repository: https://github.com/wowu/docker-rollout
+nav_external_links:
+  - title: GitHub
+    url: https://github.com/wowu/docker-rollout
+    hide_icon: false # set to true to hide the external link icon - defaults to false
+    opens_in_new_tab: false # set to true to open this link in a new tab - defaults to false
+callouts:
+  warning:
+    title: Warning
+    color: red
+search:
+  focus_shortcut_key: 'k'
+
+plugins:
+  - jekyll-default-layout
