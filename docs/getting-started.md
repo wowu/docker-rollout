@@ -98,7 +98,7 @@ This command will scale the service to two instances, wait for the new container
 
 If your service has a healthcheck defined, _docker rollout_ will wait for the new containers to become healthy before removing the old ones. Reverse proxy like Traefik or nginx-proxy will route traffic to the new container automatically, after it becomes healthy.
 
-See [CLI Options](options) for the list of all available options.
+See [CLI Options](cli-options) for the list of all available options.
 
 ## Deployment script
 
