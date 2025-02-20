@@ -31,6 +31,9 @@ services:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
 ```
 
+{: .security }
+Mounting the Docker socket is a potential security risk. If the traefik container is compromised, an attacker could gain full control of the host. If you are concerned about this risk, consider using [docker-socket-proxy](https://github.com/Tecnativa/docker-socket-proxy) to access the Docker socket from the traefik container, as shown [here](https://chriswiegman.com/2019/11/protecting-your-docker-socket-with-traefik-2/).
+
 ## Steps
 
 1. Change domain in `docker-compose.yml` to a domain pointing to your server
