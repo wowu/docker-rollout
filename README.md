@@ -50,7 +50,7 @@ Options:
 - `--wait-after-healthy SECONDS` - (not required) - Time to wait after new container is healthy before removing old container. Works when healthcheck is defined. Default: 0
 - `--env-file FILE` - (not required) - Path to env file, can be specified multiple times, as in `docker compose`.
 
-See [examples](docs/examples) for sample `docker-compose.yml` files.
+See [examples](https://docker-rollout.wowu.dev/examples/) in docs for sample `docker-compose.yml` files.
 
 ### ⚠️ Caveats
 

@@ -5,7 +5,7 @@ nav_order: 4
 
 # Upgrading docker rollout
 
-All existing Docker Rollout versions are backward compatible. You can upgrade to the latest version by downloading the script again.
+All existing Docker Rollout versions are backwards compatible. You can upgrade to the latest version by downloading the script again.
 
 1. Check the current plugin version:
 
