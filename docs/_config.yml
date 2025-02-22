@@ -15,6 +15,9 @@ callouts:
   warning:
     title: Warning
     color: red
+  security:
+    title: Security Note
+    color: yellow
 search:
   focus_shortcut_key: 'k'
 gh_edit_link: true
