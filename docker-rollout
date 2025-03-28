@@ -98,7 +98,7 @@ main() {
 
   # Check if first container has healthcheck
   # shellcheck disable=SC2086 # DOCKER_ARGS must be unquoted to allow multiple arguments
-  if docker $DOCKER_ARGS inspect --format='{{json .State.Health}}' "$(echo $OLD_CONTAINER_IDS | cut -d\  -f 1)" | grep -q "Status"; then
+  if docker $DOCKER_ARGS inspect --format='{{json .State.Health}}' "$(echo $NEW_CONTAINER_IDS | cut -d\  -f 1)" | grep -q "Status"; then
     echo "==> Waiting for new containers to be healthy (timeout: $HEALTHCHECK_TIMEOUT seconds)"
     for _ in $(seq 1 "$HEALTHCHECK_TIMEOUT"); do
       SUCCESS=0
@@ -125,6 +125,13 @@ main() {
     done
 
     if [ "$SUCCESS" != "$SCALE" ]; then
+      for NEW_CONTAINER_ID in $NEW_CONTAINER_IDS; do
+        echo "==> Health check status for container $NEW_CONTAINER_ID"
+
+        # shellcheck disable=SC2086 # DOCKER_ARGS must be unquoted to allow multiple arguments
+        docker $DOCKER_ARGS inspect --format='{{json .State.Health}}' "$NEW_CONTAINER_ID"
+      done
+
       echo "==> New containers are not healthy. Rolling back." >&2
 
       docker $DOCKER_ARGS stop $NEW_CONTAINER_IDS
@@ -132,7 +139,7 @@ main() {
 
       exit 1
     fi
-    
+
     if [ "$WAIT_AFTER_HEALTHY_DELAY" != "0" ]; then
       echo "==> Waiting for healthy containers to settle down ($WAIT_AFTER_HEALTHY_DELAY seconds)"
       sleep $WAIT_AFTER_HEALTHY_DELAY
