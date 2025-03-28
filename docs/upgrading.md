@@ -10,9 +10,16 @@ All existing Docker Rollout versions are backwards compatible. You can upgrade t
 1. Check the current plugin version:
 
    ```bash
+   docker rollout --version
+   #=> docker-rollout version v0.10
+   ```
+
+   or if version option is not available:
+
+   ```bash
    ~/.docker/cli-plugins/docker-rollout docker-cli-plugin-metadata
    #=> ...
-   #=> "Version": "v0.9",
+   #=> "Version": "v0.10",
    #=> ...
    ```
 
