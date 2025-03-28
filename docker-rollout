@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-VERSION=v0.9
+VERSION=v0.10
 
 # Defaults
 HEALTHCHECK_TIMEOUT=60
