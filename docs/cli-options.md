@@ -100,3 +100,18 @@ Multiple env files:
 docker rollout --env-file .env --env-file .env.prod <service-name>
 ```
 
+## `--pre-stop-hook COMMAND`
+
+Command to run in the old container before stopping it. Can be used for marking the container as unhealthy to make proxy stop sending requests to it, see [request draining](examples/request-draining.md) below.
+
+**Example**
+
+Deploy a new version of the service and mark the old container as unhealthy before stopping it:
+
+```bash
+docker rollout --pre-stop-hook "touch /tmp/drain && sleep 10" <service-name>
+```
+
+{: .warning }
+This requires the service to have a healthcheck defined in `docker-compose.yml` or `Dockerfile` that will fail if `/tmp/drain` file exists.
+

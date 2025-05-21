@@ -110,7 +110,7 @@ git pull
 # Build new app image
 docker compose build web
 # Run database migrations
-docker compose run web rake db:migrate
+docker compose run --rm web rake db:migrate
 # Deploy new version
 docker rollout web
 ```

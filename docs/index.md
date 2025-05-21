@@ -29,7 +29,8 @@ Using `docker compose up` to deploy a new version of a service causes downtime b
 
 - Your service cannot have `container_name` and `ports` defined in `docker-compose.yml`, as it's not possible to run multiple containers with the same name or port mapping. Use a proxy as described below.
 - Proxy like [Traefik](https://github.com/traefik/traefik) or [nginx-proxy](https://github.com/nginx-proxy/nginx-proxy) is required to route traffic to the containers. Refer to the [Examples](examples) for sample compose files.
-- Each deployment will increment the index in container name (e.g. `project-web-1` -> `project-web-2`).
+- Each deployment will increment the number in container name (e.g. `project-web-1` -> `project-web-2`).
+- Some requests might still fail during the brief moment between when the old container is stopped and when the proxy stops sending traffic to it. In most cases, this isn't an issue, but you can fully prevent it by configuring request draining, which requires a slightly more complex setup.
 
 ## Installation
 
