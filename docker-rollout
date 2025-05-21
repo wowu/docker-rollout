@@ -153,8 +153,6 @@ main() {
     sleep "$NO_HEALTHCHECK_TIMEOUT"
   fi
 
-  echo "==> Stopping and removing old containers"
-
   if [ -n "$PRE_STOP_HOOK" ]; then
     echo "==> Running pre-stop hook: $PRE_STOP_HOOK"
 
@@ -163,6 +161,8 @@ main() {
       docker $DOCKER_ARGS exec "$OLD_CONTAINER_ID" sh -c "$PRE_STOP_HOOK"
     done
   fi
+
+  echo "==> Stopping and removing old containers"
 
   # shellcheck disable=SC2086 # DOCKER_ARGS and OLD_CONTAINER_IDS must be unquoted to allow multiple arguments
   docker $DOCKER_ARGS stop $OLD_CONTAINER_IDS
@@ -199,6 +199,7 @@ while [ $# -gt 0 ]; do
   --pre-stop-hook)
     PRE_STOP_HOOK="$2"
     shift 2
+    ;;
   -v | --version)
     echo "docker-rollout version $VERSION"
     exit 0
