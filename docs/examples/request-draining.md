@@ -1,5 +1,5 @@
 ---
-title: Request Draining
+title: Traefik w/ Request Draining
 parent: Examples
 ---
 

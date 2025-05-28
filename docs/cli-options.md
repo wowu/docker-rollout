@@ -12,7 +12,7 @@ nav_order: 3
 
 ## Docker flags
 
-All docker flags can be used with `docker rollout` normally, like `--context`, `--env`, `--log-level`, etc.
+All docker flags can be used with `docker rollout` as usual, like `--context`, `--env`, `--log-level`, etc.
 
 ```bash
 docker --context my-remote-context rollout <service-name>
@@ -22,7 +22,7 @@ The plugin flags are described below.
 
 ## `-f | --file FILE`
 
-Path to compose file, can be specified multiple times, as in `docker compose`.
+Path to compose file, can be specified multiple times, like in `docker compose`.
 
 **Example**
 
@@ -102,7 +102,9 @@ docker rollout --env-file .env --env-file .env.prod <service-name>
 
 ## `--pre-stop-hook COMMAND`
 
-Command to run in the old container before stopping it. Can be used for marking the container as unhealthy to make proxy stop sending requests to it, see [request draining](examples/request-draining.md) below.
+Label: `docker-rollout.pre-stop-hook`
+
+Command to run in the old container before stopping it. Can be used for marking the container as unhealthy to make proxy stop sending requests to it, see [request draining](request-draining).
 
 **Example**
 

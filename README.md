@@ -1,7 +1,12 @@
-<h1 align="center">
+<div align="center">
+<h1>
 <code>docker rollout</code><br>
 Zero Downtime Deployment for Docker Compose
 </h1>
+
+[Docs](https://docker-rollout.wowu.dev)
+</div>
+
 
 Docker CLI plugin that updates Docker Compose services without downtime.
 
@@ -59,7 +64,7 @@ See [examples](https://docker-rollout.wowu.dev/examples/) in docs for sample `do
 - Your service cannot have `container_name` and `ports` defined in `docker-compose.yml`, as it's not possible to run multiple containers with the same name or port mapping. Use a proxy as described below.
 - Proxy like [Traefik](https://github.com/traefik/traefik) or [nginx-proxy](https://github.com/nginx-proxy/nginx-proxy) is required to route traffic.
 - Each deployment will increment the number in container name (e.g. `project-web-1` -> `project-web-2`).
-- Some requests might still fail during the brief moment between when the old container is stopped and when the proxy stops sending traffic to it. In most cases, this isn't an issue, but you can fully prevent it by configuring [request draining](#true-zero-downtime-deployment-with-request-draining), which requires a slightly more complex setup.
+- To avoid dropping currently processed requests when stopping the old container, you need to setup [request draining](#draining-old-containers), which requires a slightly more complex setup.
 
 ### Sample deployment script
 
@@ -76,9 +81,9 @@ docker compose run --rm web rake db:migrate
 docker rollout web
 ```
 
-### True zero-downtime deployment with request draining
+### Draining old containers
 
-If you want to make sure that no requests are lost during deployment, you can use the following setup to implement request draining. It requires adding a healthcheck to your container that will be made failing on purpose when performing rollout to the make proxy (Traefik or nginx-proxy) stop sending requests to the old container before it's removed.
+If you want to make sure that no requests are lost during deployment, you can use the following setup to implement request draining. It requires adding a healthcheck to your container that will be failing on purpose when performing rollout to make the proxy (Traefik or nginx-proxy) stop sending requests to the old container before it's removed.
 
 1. Add additional healthcheck to your container. The check should fail when `/tmp/drain` file is present.
 
@@ -89,12 +94,12 @@ If you want to make sure that no requests are lost during deployment, you can us
      web:
        image: myapp:latest
        healthcheck:
-         test: ["CMD", "test", "!", "-f", "/tmp/drain"]
+         test: test ! -f /tmp/drain
          interval: 5s
          retries: 1
    ```
 
-   If your service already has a healthcheck:
+   If your service already has a healthcheck (e.g. `curl -f http://localhost:3000/healthcheck`):
 
    ```yml
    services:
@@ -106,11 +111,24 @@ If you want to make sure that no requests are lost during deployment, you can us
          retries: 1
    ```
 
+
 2. Use the following command to perform a zero-downtime deployment:
 
    ```bash
    docker rollout web --pre-stop-hook "touch /tmp/drain && sleep 10"
    ```
+
+   or add the following label to your service in `docker-compose.yml`:
+
+   ```yml
+   services:
+     web:
+       image: myapp:latest
+       labels:
+         docker-rollout.pre-stop-hook: "touch /tmp/drain && sleep 10"
+   ```
+
+   Remember that docker-rollout reads labels from the old container, so **this hook will be executed during the next deployment**. CLI options have higher priority than container labels, so you can use it to override the label value.
 
    **Important:** make sure the sleep time is longer than the healthcheck `interval` × `retries` + `time to finish processing open requests` (e.g. interval: 10s, retries: 3, additional time of 5s = sleep 35) so the healthcheck has enough time to mark the container as unhealthy.
 
@@ -124,7 +142,7 @@ With this configuration, a rollout process looks like this:
 6. Proxy stops sending requests to the old container.
 7. Old container is removed.
 
-## Why?
+## Why use docker-rollout?
 
 Using `docker compose up` to deploy a new version of your app causes downtime because the app container has to be stopped before the new container is created.
 If your application takes a while to boot, this may be noticeable to your users.
@@ -137,4 +155,4 @@ If you're using Docker healthchecks, Traefik will make sure that traffic is only
 
 ## License
 
-[MIT License](LICENSE) &copy; Karol Musur
+[MIT License](LICENSE) &copy; [Karol Musur](https://wowu.dev)

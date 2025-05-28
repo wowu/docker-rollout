@@ -30,11 +30,9 @@ Using `docker compose up` to deploy a new version of a service causes downtime b
 - Your service cannot have `container_name` and `ports` defined in `docker-compose.yml`, as it's not possible to run multiple containers with the same name or port mapping. Use a proxy as described below.
 - Proxy like [Traefik](https://github.com/traefik/traefik) or [nginx-proxy](https://github.com/nginx-proxy/nginx-proxy) is required to route traffic to the containers. Refer to the [Examples](examples) for sample compose files.
 - Each deployment will increment the number in container name (e.g. `project-web-1` -> `project-web-2`).
-- Some requests might still fail during the brief moment between when the old container is stopped and when the proxy stops sending traffic to it. In most cases, this isn't an issue, but you can fully prevent it by configuring request draining, which requires a slightly more complex setup.
+- To avoid dropping currently processed requests when stopping the old container, you need to setup [request draining](#draining-old-containers), which requires a slightly more complex setup.
 
 ## Installation
-
-Quick install:
 
 ```bash
 # Create directory for Docker cli plugins
@@ -70,6 +68,12 @@ docker compose run web rake db:migrate
 docker rollout web
 ```
 
+### Draining old containers
+
+If you want to make sure that no requests are lost during deployment, you can use the following setup to implement request draining. It requires adding a healthcheck to your container that will be failing on purpose when performing rollout to make the proxy (Traefik or nginx-proxy) stop sending requests to the old container before it's removed.
+
+See [Request draining](request-draining).
+
 ## Rationale and alternatives
 
 Using `docker compose up` to deploy a new version of a service causes downtime because the app container is stopped before the new container is created.
@@ -83,5 +87,5 @@ If you're using Docker healthchecks, Traefik will make sure that traffic is only
 
 ## License
 
-[MIT License](https://github.com/wowu/docker-rollout/blob/main/LICENSE) &copy; Karol Musur
+[MIT License](https://github.com/wowu/docker-rollout/blob/main/LICENSE) &copy; [Karol Musur](https://wowu.dev)
 

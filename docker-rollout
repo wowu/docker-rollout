@@ -153,13 +153,20 @@ main() {
     sleep "$NO_HEALTHCHECK_TIMEOUT"
   fi
 
+  # Check if pre-stop hook is defined in first old container label
+  # shellcheck disable=SC2086 # DOCKER_ARGS must be unquoted to allow multiple arguments
+  PRE_STOP_HOOK=${PRE_STOP_HOOK:-$(docker $DOCKER_ARGS inspect --format='{{index .Config.Labels "docker-rollout.pre-stop-hook"}}' "${OLD_CONTAINER_IDS[0]}")}
+
   if [ -n "$PRE_STOP_HOOK" ]; then
     echo "==> Running pre-stop hook: $PRE_STOP_HOOK"
 
     for OLD_CONTAINER_ID in $OLD_CONTAINER_IDS; do
       # shellcheck disable=SC2086 # DOCKER_ARGS must be unquoted to allow multiple arguments
-      docker $DOCKER_ARGS exec "$OLD_CONTAINER_ID" sh -c "$PRE_STOP_HOOK"
+      docker $DOCKER_ARGS exec "$OLD_CONTAINER_ID" sh -c "$PRE_STOP_HOOK" &
     done
+
+    # Wait for all pre-stop hooks to finish
+    wait
   fi
 
   echo "==> Stopping and removing old containers"
