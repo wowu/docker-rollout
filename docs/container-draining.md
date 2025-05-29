@@ -1,11 +1,11 @@
 ---
-title: Request Draining
+title: Container Draining
 nav_order: 4
 ---
 
-# True zero-downtime deployment with request draining
+# True zero-downtime deployment with container draining
 
-If you want to make sure that no requests are lost during deployment, you can use the following setup to implement request draining. It requires adding a healthcheck to your container that will be failing on purpose when performing rollout to make the proxy (Traefik or nginx-proxy) stop sending requests to the old container before it's removed.
+If you want to make sure that no requests are lost during deployment, you can use the following setup to implement container draining. It requires adding a healthcheck to your container that will be failing on purpose when performing rollout to make the proxy (Traefik or nginx-proxy) stop sending requests to the old container before it's removed. This allows the old container to finish processing any open requests before it is stopped.
 
 1. Add additional healthcheck to your container. The check should fail when `/tmp/drain` file is present.
 
@@ -64,4 +64,4 @@ With this configuration, a rollout process looks like this:
 6. Proxy stops sending requests to the old container.
 7. Old container is removed.
 
-See sample configuration for [Traefik](examples/request-draining.md).
+See sample configuration for [Traefik](examples/container-draining.md).

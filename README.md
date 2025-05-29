@@ -4,7 +4,7 @@
 Zero Downtime Deployment for Docker Compose
 </h1>
 
-[Docs](https://docker-rollout.wowu.dev)
+[Documentation](https://docker-rollout.wowu.dev)
 </div>
 
 
@@ -17,7 +17,7 @@ Simply replace `docker compose up -d <service>` with `docker rollout <service>` 
 - [Usage](#usage)
   - [⚠️ Caveats](#️-caveats)
   - [Sample deployment script](#sample-deployment-script)
-  - [True zero-downtime deployment with request draining](#true-zero-downtime-deployment-with-request-draining)
+  - [Draining old containers](#draining-old-containers)
 - [Why?](#why)
 - [License](#license)
 
@@ -55,16 +55,16 @@ Options:
 - `-w | --wait SECONDS` - (not required) - Time to wait for new container to be ready if healthcheck is not defined. Default: 10
 - `--wait-after-healthy SECONDS` - (not required) - Time to wait after new container is healthy before removing old container. Works when healthcheck is defined. Default: 0
 - `--env-file FILE` - (not required) - Path to env file, can be specified multiple times, as in `docker compose`.
-- `--pre-stop-hook` - (not required) - Command to run in the old container before stopping it. Can be used for marking the container as unhealthy to make proxy stop sending requests to it, see [request draining](#true-zero-downtime-deployment-with-request-draining) below.
+- `--pre-stop-hook` - (not required) - Command to run in the old container before stopping it. Can be used for marking the container as unhealthy to make proxy stop sending requests to it, see [container draining](#draining-old-containers) below.
 
-See [examples](https://docker-rollout.wowu.dev/examples/) in docs for sample `docker-compose.yml` files.
+See [detailed options description](https://docker-rollout.wowu.dev/cli-options) and [compose.yml file examples](https://docker-rollout.wowu.dev/examples/) in docs.
 
 ### ⚠️ Caveats
 
 - Your service cannot have `container_name` and `ports` defined in `docker-compose.yml`, as it's not possible to run multiple containers with the same name or port mapping. Use a proxy as described below.
 - Proxy like [Traefik](https://github.com/traefik/traefik) or [nginx-proxy](https://github.com/nginx-proxy/nginx-proxy) is required to route traffic.
 - Each deployment will increment the number in container name (e.g. `project-web-1` -> `project-web-2`).
-- To avoid dropping currently processed requests when stopping the old container, you need to setup [request draining](#draining-old-containers), which requires a slightly more complex setup.
+- To avoid dropping currently processed requests when stopping the old container, you need to setup [container draining](#draining-old-containers), which requires a slightly more complex setup.
 
 ### Sample deployment script
 
@@ -83,7 +83,7 @@ docker rollout web
 
 ### Draining old containers
 
-If you want to make sure that no requests are lost during deployment, you can use the following setup to implement request draining. It requires adding a healthcheck to your container that will be failing on purpose when performing rollout to make the proxy (Traefik or nginx-proxy) stop sending requests to the old container before it's removed.
+If you want to make sure that no requests are lost during deployment, you can use the following setup to implement container draining. It requires adding a healthcheck to your container that will be failing on purpose when performing rollout to make the proxy (Traefik or nginx-proxy) stop sending requests to the old container before it's removed.
 
 1. Add additional healthcheck to your container. The check should fail when `/tmp/drain` file is present.
 
@@ -128,19 +128,11 @@ If you want to make sure that no requests are lost during deployment, you can us
          docker-rollout.pre-stop-hook: "touch /tmp/drain && sleep 10"
    ```
 
-   Remember that docker-rollout reads labels from the old container, so **this hook will be executed during the next deployment**. CLI options have higher priority than container labels, so you can use it to override the label value.
+   Remember that docker-rollout reads labels from the old container, so **this hook will work on the next deployment**. CLI options have higher priority than container labels, so you can use it to override the label value.
 
    **Important:** make sure the sleep time is longer than the healthcheck `interval` × `retries` + `time to finish processing open requests` (e.g. interval: 10s, retries: 3, additional time of 5s = sleep 35) so the healthcheck has enough time to mark the container as unhealthy.
 
-With this configuration, a rollout process looks like this:
-
-1. New container is started.
-2. Docker daemon marks the old container as healthy.
-3. Proxy starts sending requests to the new container alongside the old container.
-4. We create `/tmp/drain` file in the old container.
-5. Docker daemon marks the old container as unhealthy.
-6. Proxy stops sending requests to the old container.
-7. Old container is removed.
+Read more about [container draining in the docs](https://docker-rollout.wowu.dev/container-draining).
 
 ## Why use docker-rollout?
 

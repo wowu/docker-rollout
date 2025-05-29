@@ -1,9 +1,9 @@
 ---
-title: Traefik w/ Request Draining
+title: Traefik w/ Container Draining
 parent: Examples
 ---
 
-# Request Draining with Traefik
+# Container Draining with Traefik
 
 Works with Docker Compose v2.
 

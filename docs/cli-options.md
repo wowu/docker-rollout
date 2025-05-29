@@ -18,7 +18,7 @@ All docker flags can be used with `docker rollout` as usual, like `--context`, `
 docker --context my-remote-context rollout <service-name>
 ```
 
-The plugin flags are described below.
+The plugin flags are described below. Some of the options can be defined as container labels.
 
 ## `-f | --file FILE`
 
@@ -104,7 +104,7 @@ docker rollout --env-file .env --env-file .env.prod <service-name>
 
 Label: `docker-rollout.pre-stop-hook`
 
-Command to run in the old container before stopping it. Can be used for marking the container as unhealthy to make proxy stop sending requests to it, see [request draining](request-draining).
+Command to run in the old container before stopping it. Can be used for marking the container as unhealthy to gracefully finish running requests before deleting the container, see [container draining](container-draining).
 
 **Example**
 
