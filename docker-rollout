@@ -154,8 +154,9 @@ main() {
   fi
 
   # Check if pre-stop hook is defined in first old container label
+  FIRST_OLD_CONTAINER_ID=$(echo "$OLD_CONTAINER_IDS" | cut -d\  -f 1)
   # shellcheck disable=SC2086 # DOCKER_ARGS must be unquoted to allow multiple arguments
-  PRE_STOP_HOOK=${PRE_STOP_HOOK:-$(docker $DOCKER_ARGS inspect --format='{{index .Config.Labels "docker-rollout.pre-stop-hook"}}' "${OLD_CONTAINER_IDS[0]}")}
+  PRE_STOP_HOOK=${PRE_STOP_HOOK:-$(docker $DOCKER_ARGS inspect --format='{{index .Config.Labels "docker-rollout.pre-stop-hook"}}' "$FIRST_OLD_CONTAINER_ID")}
 
   if [ -n "$PRE_STOP_HOOK" ]; then
     echo "==> Running pre-stop hook: $PRE_STOP_HOOK"
