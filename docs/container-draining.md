@@ -3,7 +3,9 @@ title: Container Draining
 nav_order: 4
 ---
 
-# True zero-downtime deployment with container draining
+# Stop old containers gracefully with container draining
+
+*Available since v0.12*
 
 If you want to make sure that no requests are lost during deployment, you can use the following setup to implement container draining. It requires adding a healthcheck to your container that will be failing on purpose when performing rollout to make the proxy (Traefik or nginx-proxy) stop sending requests to the old container before it's removed. This allows the old container to finish processing any open requests before it is stopped.
 
@@ -52,7 +54,8 @@ If you want to make sure that no requests are lost during deployment, you can us
 
    Remember that docker-rollout reads labels from the old container, so **this hook will be executed during the next deployment**. CLI options have higher priority than container labels, so you can use it to override the label value.
 
-   **Important:** make sure the sleep time is longer than the healthcheck `interval` × `retries` + `time to finish processing open requests` (e.g. interval: 10s, retries: 3, additional time of 5s = sleep 35) so the healthcheck has enough time to mark the container as unhealthy.
+   {: .important }
+   Make sure the sleep time is longer than the healthcheck `interval` × `retries` + `time to finish processing open requests` (e.g. interval: 10s, retries: 3, additional time of 5s = sleep 35) so the healthcheck has enough time to mark the container as unhealthy.
 
 With this configuration, a rollout process looks like this:
 
@@ -64,4 +67,4 @@ With this configuration, a rollout process looks like this:
 6. Proxy stops sending requests to the old container.
 7. Old container is removed.
 
-See sample configuration for [Traefik](examples/container-draining.md).
+See sample configuration for [Traefik](examples/container-draining).

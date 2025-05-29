@@ -116,3 +116,7 @@ docker rollout web
 ```
 
 Usually `docker rollout <service-name>` will be a drop-in replacement for `docker compose up -d <service-name>` in your deployment scripts.
+
+## Stoping old containers gracefully
+
+If you want to make sure that no requests are lost during deployment, you can use the [container draining](container-draining) setup. It's slightly more complex, but it allows the old container to finish processing any open requests before it is stopped.

@@ -29,6 +29,7 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.whoami.entrypoints=web"
       - "traefik.http.routers.whoami.rule=Host(`example.com`)"
+      - "docker-rollout.pre-stop-hook=touch /tmp/drain && sleep 10"
     healthcheck:
       test: "test ! -f /tmp/drain"
       interval: 5s
@@ -47,7 +48,6 @@ services:
       - "8080:8080"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
-
 ```
 
 ## Steps
@@ -63,7 +63,9 @@ services:
 3. Deploy new version of `whoami` service without downtime
 
    ```bash
-   docker rollout whoami --pre-stop-hook "touch /tmp/drain && sleep 10"
+   docker rollout whoami
    ```
 
    New container will be created, then the old container will be marked as unhealthy and removed after 10 seconds. Traefik will stop sending requests to the old container when it becomes unhealthy, allowing it to finish pending requests before being removed.
+
+Read more about [container draining](/container-draining).

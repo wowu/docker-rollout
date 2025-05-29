@@ -23,15 +23,13 @@ All existing Docker Rollout versions are backwards compatible. You can upgrade t
    #=> ...
    ```
 
-2. If new version is available, download the latest version:
+2. You can check the latest version on the [releases page](https://github.com/wowu/docker-rollout/releases). Download the latest version with:
 
    ```bash
    curl https://raw.githubusercontent.com/wowu/docker-rollout/master/docker-rollout -o ~/.docker/cli-plugins/docker-rollout
    ```
 
-   You can check the latest version on the [releases page](https://github.com/wowu/docker-rollout/releases).
-
-3. You may need to make the file executable again:
+3. Make the file executable again:
 
    ```bash
    chmod +x ~/.docker/cli-plugins/docker-rollout
