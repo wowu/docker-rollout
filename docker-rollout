@@ -59,6 +59,7 @@ Options:
       --wait-after-healthy N  When healthcheck is defined and succeeds, wait for additional N seconds
                               before stopping the old container (default: 0 seconds)
       --env-file FILE         Specify an alternate environment file
+      --pre-stop-hook CMD     Run a command in the old container before stopping it.
   -v, --version               Print plugin version
 
 EOF
@@ -156,6 +157,23 @@ main() {
     sleep "$NO_HEALTHCHECK_TIMEOUT"
   fi
 
+  # Check if pre-stop hook is defined in first old container label
+  FIRST_OLD_CONTAINER_ID=$(echo "$OLD_CONTAINER_IDS" | cut -d\  -f 1)
+  # shellcheck disable=SC2086 # DOCKER_ARGS must be unquoted to allow multiple arguments
+  PRE_STOP_HOOK=${PRE_STOP_HOOK:-$(docker $DOCKER_ARGS inspect --format='{{index .Config.Labels "docker-rollout.pre-stop-hook"}}' "$FIRST_OLD_CONTAINER_ID")}
+
+  if [ -n "$PRE_STOP_HOOK" ]; then
+    echo "==> Running pre-stop hook: $PRE_STOP_HOOK"
+
+    for OLD_CONTAINER_ID in $OLD_CONTAINER_IDS; do
+      # shellcheck disable=SC2086 # DOCKER_ARGS must be unquoted to allow multiple arguments
+      docker $DOCKER_ARGS exec "$OLD_CONTAINER_ID" sh -c "$PRE_STOP_HOOK" &
+    done
+
+    # Wait for all pre-stop hooks to finish
+    wait
+  fi
+
   echo "==> Stopping and removing old containers"
 
   # shellcheck disable=SC2086 # DOCKER_ARGS and OLD_CONTAINER_IDS must be unquoted to allow multiple arguments
@@ -188,6 +206,10 @@ while [ $# -gt 0 ]; do
     ;;
   --wait-after-healthy)
     WAIT_AFTER_HEALTHY_DELAY="$2"
+    shift 2
+    ;;
+  --pre-stop-hook)
+    PRE_STOP_HOOK="$2"
     shift 2
     ;;
   -v | --version)

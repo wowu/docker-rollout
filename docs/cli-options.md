@@ -12,17 +12,17 @@ nav_order: 3
 
 ## Docker flags
 
-All docker flags can be used with `docker rollout` normally, like `--context`, `--env`, `--log-level`, etc.
+All docker flags can be used with `docker rollout` as usual, like `--context`, `--env`, `--log-level`, etc.
 
 ```bash
 docker --context my-remote-context rollout <service-name>
 ```
 
-The plugin flags are described below.
+The plugin flags are described below. Some of the options can be defined as container labels.
 
 ## `-f | --file FILE`
 
-Path to compose file, can be specified multiple times, as in `docker compose`.
+Path to compose file, can be specified multiple times, like in `docker compose`.
 
 **Example**
 
@@ -99,4 +99,21 @@ Multiple env files:
 ```bash
 docker rollout --env-file .env --env-file .env.prod <service-name>
 ```
+
+## `--pre-stop-hook COMMAND`
+
+Label: `docker-rollout.pre-stop-hook`
+
+Command to run in the old container before stopping it. Can be used for marking the container as unhealthy to gracefully finish running requests before deleting the container, see [container draining](container-draining).
+
+**Example**
+
+Deploy a new version of the service and mark the old container as unhealthy before stopping it:
+
+```bash
+docker rollout --pre-stop-hook "touch /tmp/drain && sleep 10" <service-name>
+```
+
+{: .warning }
+This requires the service to have a healthcheck defined in `docker-compose.yml` or `Dockerfile` that will fail if `/tmp/drain` file exists.
 

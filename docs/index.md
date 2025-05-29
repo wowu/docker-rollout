@@ -29,11 +29,10 @@ Using `docker compose up` to deploy a new version of a service causes downtime b
 
 - Your service cannot have `container_name` and `ports` defined in `docker-compose.yml`, as it's not possible to run multiple containers with the same name or port mapping. Use a proxy as described below.
 - Proxy like [Traefik](https://github.com/traefik/traefik) or [nginx-proxy](https://github.com/nginx-proxy/nginx-proxy) is required to route traffic to the containers. Refer to the [Examples](examples) for sample compose files.
-- Each deployment will increment the index in container name (e.g. `project-web-1` -> `project-web-2`).
+- Each deployment will increment the number in container name (e.g. `project-web-1` -> `project-web-2`).
+- To avoid dropping currently processed requests when stopping the old container, you need to setup [container draining](#draining-old-containers), which requires a slightly more complex setup.
 
 ## Installation
-
-Quick install:
 
 ```bash
 # Create directory for Docker cli plugins
@@ -69,6 +68,12 @@ docker compose run web rake db:migrate
 docker rollout web
 ```
 
+### Draining old containers
+
+If you want to make sure that no requests are lost during deployment, you can use the following setup to implement container draining. It requires adding a healthcheck to your container that will be failing on purpose when performing rollout to make the proxy (Traefik or nginx-proxy) stop sending requests to the old container before it's removed.
+
+See [container draining](container-draining).
+
 ## Rationale and alternatives
 
 Using `docker compose up` to deploy a new version of a service causes downtime because the app container is stopped before the new container is created.
@@ -82,5 +87,5 @@ If you're using Docker healthchecks, Traefik will make sure that traffic is only
 
 ## License
 
-[MIT License](https://github.com/wowu/docker-rollout/blob/main/LICENSE) &copy; Karol Musur
+[MIT License](https://github.com/wowu/docker-rollout/blob/main/LICENSE) &copy; [Karol Musur](https://wowu.dev)
 
