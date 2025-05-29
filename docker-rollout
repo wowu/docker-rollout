@@ -133,6 +133,10 @@ main() {
 
         # shellcheck disable=SC2086 # DOCKER_ARGS must be unquoted to allow multiple arguments
         docker $DOCKER_ARGS inspect --format='{{json .State.Health}}' "$NEW_CONTAINER_ID"
+
+        echo "==> Logs for container $NEW_CONTAINER_ID"
+        # shellcheck disable=SC2086 # DOCKER_ARGS must be unquoted to allow multiple arguments
+        docker $DOCKER_ARGS logs "$NEW_CONTAINER_ID"
       done
 
       echo "==> New containers are not healthy. Rolling back." >&2
