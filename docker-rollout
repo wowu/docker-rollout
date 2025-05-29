@@ -77,14 +77,14 @@ healthcheck() {
 
 scale() {
   # shellcheck disable=SC2086 # COMPOSE_FILES and ENV_FILES must be unquoted to allow multiple files
-  $COMPOSE_COMMAND $COMPOSE_FILES $ENV_FILES up --detach --scale "$1=$2" --no-recreate "$1"
+  $COMPOSE_COMMAND $COMPOSE_FILES $ENV_FILES up --wait --scale "$1=$2" --no-recreate "$1"
 }
 
 main() {
   # shellcheck disable=SC2086 # COMPOSE_FILES and ENV_FILES must be unquoted to allow multiple files
   if [ -z "$($COMPOSE_COMMAND $COMPOSE_FILES $ENV_FILES ps --quiet "$SERVICE")" ]; then
     echo "==> Service '$SERVICE' is not running. Starting the service."
-    $COMPOSE_COMMAND $COMPOSE_FILES $ENV_FILES up --detach --no-recreate "$SERVICE"
+    $COMPOSE_COMMAND $COMPOSE_FILES $ENV_FILES up --wait --no-recreate "$SERVICE"
     exit 0
   fi
 
