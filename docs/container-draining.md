@@ -60,7 +60,7 @@ If you want to make sure that no requests are lost during deployment, you can us
 With this configuration, a rollout process looks like this:
 
 1. New container is started.
-2. Docker daemon marks the old container as healthy.
+2. Docker daemon marks the new container as healthy.
 3. Proxy starts sending requests to the new container alongside the old container.
 4. We create `/tmp/drain` file in the old container.
 5. Docker daemon marks the old container as unhealthy.
