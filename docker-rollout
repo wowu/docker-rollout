@@ -59,6 +59,8 @@ Options:
       --wait-after-healthy N  When healthcheck is defined and succeeds, wait for additional N seconds
                               before stopping the old container (default: 0 seconds)
       --env-file FILE         Specify an alternate environment file
+  -p, --project-name NAME     Specify an alternate project name
+      --profile NAME          Specify an alternate profile to use
       --pre-stop-hook CMD     Run a command in the old container before stopping it.
   -v, --version               Print plugin version
 
@@ -194,6 +196,14 @@ while [ $# -gt 0 ]; do
     ;;
   --env-file)
     ENV_FILES="$ENV_FILES --env-file $2"
+    shift 2
+    ;;
+  -p | --project-name)
+    COMPOSE_COMMAND="$COMPOSE_COMMAND --project-name $2"
+    shift 2
+    ;;
+  --profile)
+    COMPOSE_COMMAND="$COMPOSE_COMMAND --profile $2"
     shift 2
     ;;
   -t | --timeout)
