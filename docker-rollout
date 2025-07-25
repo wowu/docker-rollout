@@ -199,11 +199,11 @@ while [ $# -gt 0 ]; do
     shift 2
     ;;
   -p | --project-name)
-    COMPOSE_FILES="$COMPOSE_FILES --project-name $2"
+    COMPOSE_COMMAND="$COMPOSE_COMMAND --project-name $2"
     shift 2
     ;;
   --profile)
-    COMPOSE_FILES="$COMPOSE_FILES --profile $2"
+    COMPOSE_COMMAND="$COMPOSE_COMMAND --profile $2"
     shift 2
     ;;
   -t | --timeout)
