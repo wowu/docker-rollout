@@ -20,7 +20,7 @@ docker --context my-remote-context rollout <service-name>
 
 The plugin flags are described below. Some of the options can be defined as container labels.
 
-## `-f | --file FILE`
+## `-f | --file PATH`
 
 Path to compose file, can be specified multiple times, like in `docker compose`.
 
@@ -80,7 +80,7 @@ Wait 10 seconds after a new container is healthy before terminating the old cont
 docker rollout --wait-after-healthy 10 <service-name>
 ```
 
-## `--env-file FILE`
+## `--env-file PATH`
 
 Path to env file, can be specified multiple times, like in `docker compose`.
 
@@ -98,6 +98,30 @@ Multiple env files:
 
 ```bash
 docker rollout --env-file .env --env-file .env.prod <service-name>
+```
+
+## `-p | --project-name NAME`
+
+Project name, as in `docker compose`.
+
+See [Docker Compose documentation](https://docs.docker.com/compose/how-tos/project-name/).
+
+**Example**
+
+```bash
+docker rollout --project-name my-project <service-name>
+```
+
+## `--profile NAME`
+
+Specify a profile to enable, as in `docker compose`.
+
+See [Docker Compose documentation](https://docs.docker.com/compose/how-tos/profiles/#start-specific-profiles).
+
+**Example**
+
+```bash
+docker rollout --profile my-profile <service-name>
 ```
 
 ## `--pre-stop-hook COMMAND`

@@ -50,12 +50,14 @@ $ docker rollout -f docker-compose.yml <service-name>
 
 Options:
 
-- `-f | --file FILE` - (not required) - Path to compose file, can be specified multiple times, as in `docker compose`.
+- `-f | --file PATH` - (not required) - Path to compose file, can be specified multiple times, as in `docker compose`.
 - `-t | --timeout SECONDS` - (not required) - Timeout in seconds to wait for new container to become healthy, if the container has healthcheck defined in `Dockerfile` or `docker-compose.yml`. Default: 60
 - `-w | --wait SECONDS` - (not required) - Time to wait for new container to be ready if healthcheck is not defined. Default: 10
 - `--wait-after-healthy SECONDS` - (not required) - Time to wait after new container is healthy before removing old container. Works when healthcheck is defined. Default: 0
-- `--env-file FILE` - (not required) - Path to env file, can be specified multiple times, as in `docker compose`.
-- `--pre-stop-hook` - (not required) - Command to run in the old container before stopping it. Can be used for marking the container as unhealthy to make proxy stop sending requests to it, see [container draining](#draining-old-containers) below.
+- `--env-file PATH` - (not required) - Path to env file, can be specified multiple times, as in `docker compose`.
+- `-p | --project-name NAME` - (not required) - Project name, as in `docker compose`.
+- `--profile NAME` - (not required) - Specify a profile to enable, as in `docker compose`.
+- `--pre-stop-hook CMD` - (not required) - Command to run in the old container before stopping it. Can be used for marking the container as unhealthy to make proxy stop sending requests to it, see [container draining](#draining-old-containers) below.
 
 See [detailed options description](https://docker-rollout.wowu.dev/cli-options) and [compose.yml file examples](https://docker-rollout.wowu.dev/examples/) in docs.
 
