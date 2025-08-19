@@ -40,6 +40,15 @@ curl https://raw.githubusercontent.com/wowu/docker-rollout/main/docker-rollout -
 chmod +x ~/.docker/cli-plugins/docker-rollout
 ```
 
+> **Note:**  
+> For production or when using `sudo`, install the plugin to `/usr/local/lib/docker/cli-plugins/` so it's available for all users.
+  ```bash
+  # production only
+  sudo mkdir -p /usr/local/lib/docker/cli-plugins
+  sudo curl https://raw.githubusercontent.com/wowu/docker-rollout/main/docker-rollout -o /usr/local/lib/docker/cli-plugins/docker-rollout
+  sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-rollout
+  ```
+
 ## Usage
 
 Run `docker rollout <name>` instead of `docker compose up -d <name>` to update a service without downtime. If you have both `docker compose` plugin and `docker-compose` command available, docker-rollout will use `docker compose` by default.
