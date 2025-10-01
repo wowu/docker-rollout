@@ -43,6 +43,10 @@ else
   exit 1
 fi
 
+# Unset Docker plugin environment variables that interfere with docker-compose
+unset DOCKER_CLI_PLUGIN_SOCKET
+unset DOCKER_CLI_PLUGIN_ORIGINAL_CLI_COMMAND
+
 usage() {
   cat <<EOF
 
