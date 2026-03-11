@@ -84,11 +84,26 @@ scale() {
 
 main() {
   # shellcheck disable=SC2086 # COMPOSE_FILES and ENV_FILES must be unquoted to allow multiple files
-  if [ -z "$($COMPOSE_COMMAND $COMPOSE_FILES $ENV_FILES ps --quiet "$SERVICE")" ]; then
+  CONTAINERS_JSON=$($COMPOSE_COMMAND $COMPOSE_FILES $ENV_FILES ps -a --format json "$SERVICE")
+
+  # Run the original script when no containers exist
+  if [ -z "$($COMPOSE_COMMAND $COMPOSE_FILES $ENV_FILES ps --quiet "$SERVICE")" ] && [ "$CONTAINERS_JSON" = "[]" ]; then
     echo "==> Service '$SERVICE' is not running. Starting the service."
     $COMPOSE_COMMAND $COMPOSE_FILES $ENV_FILES up --detach --no-recreate "$SERVICE"
     exit 0
   fi
+
+  # Run with --no-recreate param conditionally based on container state
+  echo "$CONTAINERS_JSON" | \
+  jq -r '.[] | "\(.ID) \(.Service) \(.State)"' | \
+  while read -r id service state; do
+    echo "==> Service '$SERVICE' is not running. Starting the service. exit, $state"
+    if [ "$state" == "exited" ]; then
+      $COMPOSE_COMMAND $COMPOSE_FILES $ENV_FILES up --detach "$service"
+    fi
+    $COMPOSE_COMMAND $COMPOSE_FILES $ENV_FILES up --detach --no-recreate "$service"
+    exit 0
+  done
 
   # shellcheck disable=SC2086 # COMPOSE_FILES and ENV_FILES must be unquoted to allow multiple files
   OLD_CONTAINER_IDS_STRING=$($COMPOSE_COMMAND $COMPOSE_FILES $ENV_FILES ps --quiet "$SERVICE" | tr '\n' '|' | sed 's/|$//')
