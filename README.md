@@ -40,14 +40,7 @@ curl https://raw.githubusercontent.com/wowu/docker-rollout/main/docker-rollout -
 chmod +x ~/.docker/cli-plugins/docker-rollout
 ```
 
-> **Note:**  
-> For production or when using `sudo`, install the plugin to `/usr/local/lib/docker/cli-plugins/` so it's available for all users.
-  ```bash
-  # production only
-  sudo mkdir -p /usr/local/lib/docker/cli-plugins
-  sudo curl https://raw.githubusercontent.com/wowu/docker-rollout/main/docker-rollout -o /usr/local/lib/docker/cli-plugins/docker-rollout
-  sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-rollout
-  ```
+If you use docker with sudo, or want to make docker-rollout available for all users, install it to `/usr/local/lib/docker/cli-plugins/` instead.
 
 ## Usage
 

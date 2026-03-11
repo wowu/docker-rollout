@@ -41,6 +41,8 @@ _docker rollout_ is a single bash script that lives in docker cli plugins direct
    #=> ...
    ```
 
+If you use docker with sudo or want to make `docker-rollout` available for all users, install it to `/usr/local/lib/docker/cli-plugins/` instead.
+
 ## Prepare your service
 
 _docker rollout_ requires a Docker Compose file to work. Traffic to your service must be handled by a reverse proxy with automatic service discovery like [Traefik](https://github.com/traefik/traefik) or [nginx-proxy](https://github.com/nginx-proxy/nginx-proxy). Here is a sample Compose file with Traefik reverse proxy and a service:
