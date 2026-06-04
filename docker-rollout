@@ -7,6 +7,7 @@ VERSION=v0.13
 HEALTHCHECK_TIMEOUT=60
 NO_HEALTHCHECK_TIMEOUT=10
 WAIT_AFTER_HEALTHY_DELAY=0
+ROLLING_SLEEP_SECONDS=0
 
 # Print metadata for Docker CLI plugin
 if [ "$1" = "docker-cli-plugin-metadata" ]; then
@@ -58,6 +59,10 @@ Options:
                               before stopping old container (default: $NO_HEALTHCHECK_TIMEOUT seconds)
       --wait-after-healthy N  When healthcheck is defined and succeeds, wait for additional N seconds
                               before stopping the old container (default: 0 seconds)
+      --rolling-sleep-seconds N  Sleep N seconds after starting each new container before starting
+                              the next one. If any new container becomes unhealthy during the sleep,
+                              the rollout aborts and new containers are removed (default: 0, disabled).
+                              Has no effect when scale=1.
       --env-file FILE         Specify an alternate environment file
   -p, --project-name NAME     Specify an alternate project name
       --profile NAME          Specify an alternate profile to use
@@ -77,6 +82,11 @@ healthcheck() {
   docker $DOCKER_ARGS inspect --format='{{json .State.Health.Status}}' "$1" | grep -v "unhealthy" | grep -q "healthy"
 }
 
+is_unhealthy() {
+  # shellcheck disable=SC2086 # DOCKER_ARGS must be unquoted to allow multiple arguments
+  docker $DOCKER_ARGS inspect --format='{{json .State.Health.Status}}' "$1" | grep -q '"unhealthy"'
+}
+
 scale() {
   # shellcheck disable=SC2086 # COMPOSE_FILES and ENV_FILES must be unquoted to allow multiple files
   $COMPOSE_COMMAND $COMPOSE_FILES $ENV_FILES up --detach --scale "$1=$2" --no-recreate "$1"
@@ -94,13 +104,67 @@ main() {
   OLD_CONTAINER_IDS_STRING=$($COMPOSE_COMMAND $COMPOSE_FILES $ENV_FILES ps --quiet "$SERVICE" | tr '\n' '|' | sed 's/|$//')
   OLD_CONTAINER_IDS=$(echo "$OLD_CONTAINER_IDS_STRING" | tr '|' ' ')
   SCALE=$(echo "$OLD_CONTAINER_IDS" | wc -w | tr -d ' ')
-  SCALE_TIMES_TWO=$((SCALE * 2))
-  echo "==> Scaling '$SERVICE' to '$SCALE_TIMES_TWO' instances"
-  scale "$SERVICE" $SCALE_TIMES_TWO
 
-  # Create a variable that contains the IDs of the new containers, but not the old ones
-  # shellcheck disable=SC2086 # COMPOSE_FILES and ENV_FILES must be unquoted to allow multiple files
-  NEW_CONTAINER_IDS=$($COMPOSE_COMMAND $COMPOSE_FILES $ENV_FILES ps --quiet "$SERVICE" | grep -Ev "$OLD_CONTAINER_IDS_STRING" | tr '\n' ' ')
+  if [ "$ROLLING_SLEEP_SECONDS" = "0" ] || [ "$SCALE" = "1" ]; then
+    SCALE_TIMES_TWO=$((SCALE * 2))
+    echo "==> Scaling '$SERVICE' to '$SCALE_TIMES_TWO' instances"
+    scale "$SERVICE" $SCALE_TIMES_TWO
+
+    # Create a variable that contains the IDs of the new containers, but not the old ones
+    # shellcheck disable=SC2086 # COMPOSE_FILES and ENV_FILES must be unquoted to allow multiple files
+    NEW_CONTAINER_IDS=$($COMPOSE_COMMAND $COMPOSE_FILES $ENV_FILES ps --quiet "$SERVICE" | grep -Ev "$OLD_CONTAINER_IDS_STRING" | tr '\n' ' ')
+  else
+    echo "==> Rolling out '$SERVICE' ($SCALE instances, ${ROLLING_SLEEP_SECONDS}s sleep between containers)"
+    HAS_HEALTHCHECK="false"
+
+    for i in $(seq 1 "$SCALE"); do
+      echo "==> Creating new container $i/$SCALE"
+      scale "$SERVICE" $((SCALE + i))
+
+      # shellcheck disable=SC2086 # COMPOSE_FILES and ENV_FILES must be unquoted to allow multiple files
+      NEW_CONTAINER_IDS=$($COMPOSE_COMMAND $COMPOSE_FILES $ENV_FILES ps --quiet "$SERVICE" | grep -Ev "$OLD_CONTAINER_IDS_STRING" | tr '\n' ' ')
+
+      # Detect healthcheck once from the first new container
+      if [ "$i" = "1" ]; then
+        # shellcheck disable=SC2086 # DOCKER_ARGS must be unquoted to allow multiple arguments
+        if docker $DOCKER_ARGS inspect --format='{{json .State.Health}}' "$(echo $NEW_CONTAINER_IDS | cut -d\  -f 1)" | grep -q "Status"; then
+          HAS_HEALTHCHECK="true"
+        fi
+      fi
+
+      if [ "$i" != "$SCALE" ]; then
+        echo "==> Sleeping ${ROLLING_SLEEP_SECONDS}s before next container"
+        sleep "$ROLLING_SLEEP_SECONDS"
+
+        if [ "$HAS_HEALTHCHECK" = "true" ]; then
+          UNHEALTHY_FOUND=0
+          for NEW_CONTAINER_ID in $NEW_CONTAINER_IDS; do
+            if is_unhealthy "$NEW_CONTAINER_ID"; then
+              UNHEALTHY_FOUND=1
+              break
+            fi
+          done
+
+          if [ "$UNHEALTHY_FOUND" = "1" ]; then
+            for NEW_CONTAINER_ID in $NEW_CONTAINER_IDS; do
+              echo "==> Health check status for container $NEW_CONTAINER_ID"
+              # shellcheck disable=SC2086 # DOCKER_ARGS must be unquoted to allow multiple arguments
+              docker $DOCKER_ARGS inspect --format='{{json .State.Health}}' "$NEW_CONTAINER_ID"
+              echo "==> Logs for container $NEW_CONTAINER_ID"
+              # shellcheck disable=SC2086 # DOCKER_ARGS must be unquoted to allow multiple arguments
+              docker $DOCKER_ARGS logs "$NEW_CONTAINER_ID"
+            done
+            echo "==> New containers are unhealthy. Rolling back." >&2
+            # shellcheck disable=SC2086 # DOCKER_ARGS and NEW_CONTAINER_IDS must be unquoted to allow multiple arguments
+            docker $DOCKER_ARGS stop $NEW_CONTAINER_IDS
+            # shellcheck disable=SC2086 # DOCKER_ARGS and NEW_CONTAINER_IDS must be unquoted to allow multiple arguments
+            docker $DOCKER_ARGS rm $NEW_CONTAINER_IDS
+            exit 1
+          fi
+        fi
+      fi
+    done
+  fi
 
   # Check if first container has healthcheck
   # shellcheck disable=SC2086 # DOCKER_ARGS must be unquoted to allow multiple arguments
@@ -220,6 +284,10 @@ while [ $# -gt 0 ]; do
     ;;
   --pre-stop-hook)
     PRE_STOP_HOOK="$2"
+    shift 2
+    ;;
+  --rolling-sleep-seconds)
+    ROLLING_SLEEP_SECONDS="$2"
     shift 2
     ;;
   -v | --version)
