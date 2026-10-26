@@ -7,6 +7,12 @@ VERSION=v0.14
 HEALTHCHECK_TIMEOUT=60
 NO_HEALTHCHECK_TIMEOUT=10
 WAIT_AFTER_HEALTHY_DELAY=0
+PRE_DRAIN_URL=
+PRE_DRAIN_HEADER=X-Instance
+HTTP_PROBE_IMAGE=curlimages/curl@sha256:11e64e28c5f58c8d93ee95fcf22ac055f48b0bc440e0ce7d8013bbb5ad6aa8ac
+HTTP_STABLE_SECONDS=5
+PRE_DRAIN_PROBE_NETWORK=bridge
+PROBE_CONTAINER=
 
 # Print metadata for Docker CLI plugin
 if [ "$1" = "docker-cli-plugin-metadata" ]; then
@@ -53,7 +59,7 @@ Rollout new Compose service version.
 Options:
   -h, --help                  Print usage
   -f, --file FILE             Compose configuration files
-  -t, --timeout N             Healthcheck timeout (default: $HEALTHCHECK_TIMEOUT seconds)
+  -t, --timeout N             Timeout for each health/readiness phase (default: $HEALTHCHECK_TIMEOUT seconds)
   -w, --wait N                When no healthcheck is defined, wait for N seconds
                               before stopping old container (default: $NO_HEALTHCHECK_TIMEOUT seconds)
       --wait-after-healthy N  When healthcheck is defined and succeeds, wait for additional N seconds
@@ -62,6 +68,9 @@ Options:
   -p, --project-name NAME     Specify an alternate project name
       --profile NAME          Specify an alternate profile to use
       --pre-stop-hook CMD     Run a command in the old container before stopping it.
+      --pre-drain-url URL     Verify new backends through HTTP for ${HTTP_STABLE_SECONDS}s.
+      --pre-drain-header NAME Response header containing a backend hostname or full ID (default: X-Instance).
+      --pre-drain-probe-network NAME Probe network (default: bridge).
   -v, --version               Print plugin version
 
 EOF
@@ -75,6 +84,223 @@ exit_with_usage() {
 healthcheck() {
   # shellcheck disable=SC2086 # DOCKER_ARGS must be unquoted to allow multiple arguments
   docker $DOCKER_ARGS inspect --format='{{json .State.Health.Status}}' "$1" | grep -v "unhealthy" | grep -q "healthy"
+}
+
+# Check the precise newly-created container IDs, never infer readiness from old instances.
+all_new_healthy() {
+  for NEW_CONTAINER_ID in $NEW_CONTAINER_IDS; do
+    if ! healthcheck "$NEW_CONTAINER_ID"; then
+      return 1
+    fi
+  done
+  return 0
+}
+
+# Safe only before the pre-stop hook: no old instance was drained yet.
+rollback_new_before_drain() {
+  echo "==> Readiness failed before drain; preserving old containers." >&2
+  [ -n "$NEW_CONTAINER_IDS" ] || return 1
+  # shellcheck disable=SC2086 # Multiple new container IDs are intentionally split.
+  if ! docker $DOCKER_ARGS stop $NEW_CONTAINER_IDS; then
+    echo "==> New-container cleanup FAILED at stop; manual recovery required." >&2
+    return 1
+  fi
+  # shellcheck disable=SC2086 # Multiple new container IDs are intentionally split.
+  if ! docker $DOCKER_ARGS rm $NEW_CONTAINER_IDS; then
+    echo "==> New-container cleanup FAILED at removal; manual recovery required." >&2
+    return 1
+  fi
+  return 1
+}
+
+cleanup_proxy_probe() {
+  CLEANUP_OK=0
+  if [ -n "$PROBE_CONTAINER" ]; then
+    # shellcheck disable=SC2086 # Docker global arguments are intentionally split.
+    if docker $DOCKER_ARGS rm -f "$PROBE_CONTAINER" >/dev/null 2>&1; then
+      PROBE_CONTAINER=
+    else
+      echo "==> Could not remove the temporary HTTP probe container." >&2
+      CLEANUP_OK=1
+    fi
+  fi
+  if [ -n "$PROBE_DIR" ] && [ -d "$PROBE_DIR" ]; then
+    rm -f "$PROBE_DIR/identities" "$PROBE_DIR/http"
+    rmdir "$PROBE_DIR" || CLEANUP_OK=1
+  fi
+  return "$CLEANUP_OK"
+}
+
+prepare_http_probe() {
+  : > "$PROBE_DIR/identities"
+  for HTTP_CONTAINER in $OLD_CONTAINER_IDS $NEW_CONTAINER_IDS; do
+    # shellcheck disable=SC2086 # Docker global arguments are intentionally split.
+    HTTP_METADATA=$(docker $DOCKER_ARGS inspect --format='{{.Id}} {{.Config.Hostname}}' "$HTTP_CONTAINER") || return 1
+    HTTP_ID=${HTTP_METADATA%% *}
+    HTTP_HOST=${HTTP_METADATA#* }
+    case "$HTTP_ID" in '' | *[!0-9a-f]*) return 1 ;; esac
+    [ "${#HTTP_ID}" -eq 64 ] && [ "$HTTP_ID" = "$HTTP_CONTAINER" ] || return 1
+    case "$HTTP_HOST" in '' | *[!a-zA-Z0-9_.-]*) return 1 ;; esac
+    while read -r HTTP_OTHER_ID HTTP_OTHER_HOST; do
+      if [ "$HTTP_ID" = "$HTTP_OTHER_ID" ] || [ "$HTTP_HOST" = "$HTTP_OTHER_HOST" ] ||
+         [ "$HTTP_HOST" = "$HTTP_OTHER_ID" ] || [ "$HTTP_ID" = "$HTTP_OTHER_HOST" ]; then
+        echo "==> Backend identities are ambiguous; refusing the HTTP gate." >&2
+        return 1
+      fi
+    done < "$PROBE_DIR/identities"
+    printf '%s %s\n' "$HTTP_ID" "$HTTP_HOST" >> "$PROBE_DIR/identities"
+  done
+  # No mounts or host-side HTTP client: the probe also supports remote daemons.
+  # Its own lifetime is capped in case the CLI host disappears without a trap.
+  # shellcheck disable=SC2086 # Docker global arguments are intentionally split.
+  if ! PROBE_CONTAINER=$(docker $DOCKER_ARGS run -d --rm \
+    --read-only --cap-drop ALL --security-opt no-new-privileges \
+    --network "$PRE_DRAIN_PROBE_NETWORK" --entrypoint sh \
+    "$HTTP_PROBE_IMAGE" -c 'sleep 300'); then
+    PROBE_CONTAINER=
+    echo "==> Cannot start the temporary HTTP probe container." >&2
+    return 1
+  fi
+}
+
+read_http_identity() {
+  HTTP_HEADER_COUNT=0
+  HTTP_VALUE=
+  HTTP_STATUS=
+  HTTP_IN_HEADERS=0
+  HTTP_CR=$(printf '\r')
+  while IFS= read -r HTTP_LINE; do
+    HTTP_LINE=${HTTP_LINE%"$HTTP_CR"}
+    case "$HTTP_LINE" in *"$HTTP_CR"*) return 1 ;; esac
+    case "$HTTP_LINE" in
+      HTTP/*)
+        HTTP_HEADER_COUNT=0
+        HTTP_VALUE=
+        HTTP_IN_HEADERS=1
+        ;;
+      '') HTTP_IN_HEADERS=0 ;;
+      ROLLOUT_HTTP_STATUS:*) HTTP_STATUS=${HTTP_LINE#ROLLOUT_HTTP_STATUS:} ;;
+      *)
+        [ "$HTTP_IN_HEADERS" -eq 1 ] || continue
+        case "$HTTP_LINE" in ' '* | "$(printf '\t')"*) return 1 ;; esac
+        HTTP_KEY=${HTTP_LINE%%:*}
+        [ "$HTTP_KEY" != "$HTTP_LINE" ] || return 1
+        HTTP_KEY=$(printf '%s' "$HTTP_KEY" | tr '[:upper:]' '[:lower:]')
+        if [ "$HTTP_KEY" = "$PRE_DRAIN_HEADER_LOWER" ]; then
+          HTTP_HEADER_COUNT=$((HTTP_HEADER_COUNT + 1))
+          HTTP_VALUE=$(printf '%s' "${HTTP_LINE#*:}" | sed 's/^[[:blank:]]*//;s/[[:blank:]]*$//')
+        fi
+        ;;
+    esac
+  done < "$PROBE_DIR/http"
+  HTTP_MATCH=
+  [ "$HTTP_STATUS" = 200 ] || return 1
+  # Legacy instances may not expose identity; this is not new-backend evidence.
+  [ "$HTTP_HEADER_COUNT" -ne 0 ] || return 0
+  [ "$HTTP_HEADER_COUNT" -eq 1 ] && [ -n "$HTTP_VALUE" ] || return 1
+  while read -r HTTP_ID HTTP_HOST; do
+    if [ "$HTTP_VALUE" = "$HTTP_ID" ] || [ "$HTTP_VALUE" = "$HTTP_HOST" ]; then
+      [ -z "$HTTP_MATCH" ] || return 1
+      HTTP_MATCH=$HTTP_ID
+    fi
+  done < "$PROBE_DIR/identities"
+  [ -n "$HTTP_MATCH" ]
+}
+
+http_probe_once() {
+  # Whole-second timestamps must round up: a sample started near the next
+  # second still needs its full budget to see new after a known-old response.
+  HTTP_UNTIL=$(($(command -p date +%s) + 2))
+  HTTP_REQUEST=0
+  HTTP_OBSERVED=
+  HTTP_OBSERVED_COUNT=0
+  case "$PRE_DRAIN_URL" in *\?*) HTTP_SEPARATOR='&' ;; *) HTTP_SEPARATOR='?' ;; esac
+  while :; do
+    HTTP_REQUEST=$((HTTP_REQUEST + 1))
+    # --disable must be curl's first argument; never inherit a curlrc, redirects,
+    # or insecure TLS settings. Each response is a fresh bounded observation.
+    # shellcheck disable=SC2086 # Docker global arguments are intentionally split.
+    if ! docker $DOCKER_ARGS exec "$PROBE_CONTAINER" curl --disable \
+      --silent --show-error --globoff --proto '=http,https' \
+      --connect-timeout 1 --max-time 1 --dump-header - --output /dev/null \
+      --write-out '\nROLLOUT_HTTP_STATUS:%{http_code}\n' \
+      --header 'Cache-Control: no-cache, no-store' --header 'Connection: close' \
+      "${PRE_DRAIN_URL}${HTTP_SEPARATOR}rollout_probe=$$-${ATTEMPT}-${HTTP_REQUEST}" \
+      > "$PROBE_DIR/http" 2>/dev/null; then
+      return 1
+    fi
+    read_http_identity || return 1
+    for HTTP_NEW in $NEW_CONTAINER_IDS; do
+      [ "$HTTP_MATCH" = "$HTTP_NEW" ] || continue
+      case " $HTTP_OBSERVED " in
+        *" $HTTP_NEW "*) ;;
+        *) HTTP_OBSERVED="$HTTP_OBSERVED $HTTP_NEW"; HTTP_OBSERVED_COUNT=$((HTTP_OBSERVED_COUNT + 1)) ;;
+      esac
+    done
+    [ "$HTTP_OBSERVED_COUNT" -eq "$NEW_COUNT" ] && return 0
+    [ "$(command -p date +%s)" -lt "$HTTP_UNTIL" ] || return 1
+  done
+}
+
+wait_for_proxy_ready() {
+  [ -n "$PRE_DRAIN_URL" ] || return 0
+  PROBE_DIR="${TMPDIR:-/tmp}/docker-rollout-probe-$$"
+  if ! (umask 077; mkdir "$PROBE_DIR"); then
+    echo "==> Cannot create private proxy-probe directory." >&2
+    return 1
+  fi
+  trap 'PROBE_EXIT=$?; trap - 0; cleanup_proxy_probe || true; exit "$PROBE_EXIT"' 0
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  trap 'exit 129' HUP
+  if ! prepare_http_probe; then
+    cleanup_proxy_probe || true
+    return 1
+  fi
+  NOW=$(command -p date +%s) || return 1
+  DEADLINE=$((NOW + HEALTHCHECK_TIMEOUT))
+  ATTEMPT=0
+  READY=1
+  STABLE_SINCE=
+  LAST_SAMPLE=
+  while :; do
+    if ! all_new_healthy; then
+      echo "==> New backend lost Docker health during proxy gate." >&2
+      break
+    fi
+    NOW=$(command -p date +%s) || break
+    [ "$NOW" -lt "$DEADLINE" ] || break
+    ATTEMPT=$((ATTEMPT + 1))
+    if http_probe_once && all_new_healthy; then
+      NOW=$(command -p date +%s) || break
+      [ "$NOW" -lt "$DEADLINE" ] || break
+      if [ -n "$LAST_SAMPLE" ] && [ "$((NOW - LAST_SAMPLE))" -gt 2 ]; then
+        STABLE_SINCE=
+      fi
+      LAST_SAMPLE=$NOW
+      if [ -z "$STABLE_SINCE" ]; then
+        # Unix timestamps have whole-second precision. Round the starting
+        # point up so the configured duration is never shortened by rounding.
+        STABLE_SINCE=$((NOW + 1))
+      elif [ "$((NOW - STABLE_SINCE))" -ge "$HTTP_STABLE_SECONDS" ]; then
+        echo "==> New backend identities verified for ${HTTP_STABLE_SECONDS}s ($ATTEMPT attempts)"
+        READY=0
+        break
+      fi
+    else
+      # A new successful observation must start a new complete window.
+      STABLE_SINCE=
+      LAST_SAMPLE=
+    fi
+    NOW=$(command -p date +%s) || break
+    [ "$NOW" -lt "$DEADLINE" ] || break
+    command -p sleep 1
+  done
+  if ! cleanup_proxy_probe; then READY=1; fi
+  if [ "$READY" -ne 0 ]; then
+    echo "==> Proxy readiness failed (timeout ${HEALTHCHECK_TIMEOUT}s)." >&2
+  fi
+  return "$READY"
 }
 
 scale() {
@@ -106,6 +332,10 @@ main() {
 
   # Remove only the stopped containers and let compose create fresh ones
   if [ -n "$STOPPED_CONTAINER_IDS" ]; then
+    if [ -n "$PRE_DRAIN_URL" ]; then
+      echo "==> Cannot perform a protected rollout with stopped siblings; inspect the service first." >&2
+      return 1
+    fi
     echo "==> Service '$SERVICE' has stopped containers:$STOPPED_CONTAINER_IDS. Replacing only those."
     # shellcheck disable=SC2086 # DOCKER_ARGS and STOPPED_CONTAINER_IDS must be unquoted to allow multiple arguments
     docker $DOCKER_ARGS rm $STOPPED_CONTAINER_IDS
@@ -120,15 +350,29 @@ main() {
   SCALE=$(echo "$OLD_CONTAINER_IDS" | wc -w | tr -d ' ')
   SCALE_TIMES_TWO=$((SCALE * 2))
   echo "==> Scaling '$SERVICE' to '$SCALE_TIMES_TWO' instances"
-  scale "$SERVICE" $SCALE_TIMES_TWO
+  if ! scale "$SERVICE" $SCALE_TIMES_TWO; then
+    echo "==> Compose scale failed; checking for partially started new containers." >&2
+    # shellcheck disable=SC2086 # Compose options are intentionally word-split.
+    NEW_CONTAINER_IDS=$($COMPOSE_COMMAND $COMPOSE_FILES $ENV_FILES ps --quiet "$SERVICE" | grep -Ev "$OLD_CONTAINER_IDS_STRING" | tr '\n' ' ')
+    [ -z "$NEW_CONTAINER_IDS" ] || rollback_new_before_drain
+    return 1
+  fi
 
   # Create a variable that contains the IDs of the new containers, but not the old ones
   # shellcheck disable=SC2086 # COMPOSE_FILES and ENV_FILES must be unquoted to allow multiple files
   NEW_CONTAINER_IDS=$($COMPOSE_COMMAND $COMPOSE_FILES $ENV_FILES ps --quiet "$SERVICE" | grep -Ev "$OLD_CONTAINER_IDS_STRING" | tr '\n' ' ')
+  NEW_COUNT=$(echo "$NEW_CONTAINER_IDS" | wc -w | tr -d ' ')
+  if [ "$NEW_COUNT" != "$SCALE" ]; then
+    echo "==> Expected $SCALE new container(s), found $NEW_COUNT. Aborting." >&2
+    [ -z "$NEW_CONTAINER_IDS" ] || rollback_new_before_drain
+    return 1
+  fi
 
   # Check if first container has healthcheck
+  HAS_HEALTHCHECK=0
   # shellcheck disable=SC2086 # DOCKER_ARGS must be unquoted to allow multiple arguments
   if docker $DOCKER_ARGS inspect --format='{{json .State.Health}}' "$(echo $NEW_CONTAINER_IDS | cut -d\  -f 1)" | grep -q "Status"; then
+    HAS_HEALTHCHECK=1
     echo "==> Waiting for new containers to be healthy (timeout: $HEALTHCHECK_TIMEOUT seconds)"
     for _ in $(seq 1 "$HEALTHCHECK_TIMEOUT"); do
       SUCCESS=0
@@ -176,11 +420,32 @@ main() {
 
     if [ "$WAIT_AFTER_HEALTHY_DELAY" != "0" ]; then
       echo "==> Waiting for healthy containers to settle down ($WAIT_AFTER_HEALTHY_DELAY seconds)"
-      sleep $WAIT_AFTER_HEALTHY_DELAY
+      sleep "$WAIT_AFTER_HEALTHY_DELAY"
+    fi
+    # Do not drain if a new container lost health during the settling delay.
+    if ! all_new_healthy; then
+      echo "==> New container unhealthy after settle." >&2
+      rollback_new_before_drain
+      return 1
     fi
   else
+    if [ -n "$PRE_DRAIN_URL" ]; then
+      echo "==> Protected rollout requires a Docker HEALTHCHECK." >&2
+      rollback_new_before_drain
+      return 1
+    fi
     echo "==> Waiting for new containers to be ready ($NO_HEALTHCHECK_TIMEOUT seconds)"
     sleep "$NO_HEALTHCHECK_TIMEOUT"
+  fi
+
+  # Confirm the new version through the proxy before starting irreversible drain.
+  if ! wait_for_proxy_ready; then
+    rollback_new_before_drain
+    return 1
+  fi
+  if [ -n "$PRE_DRAIN_URL" ] && ! all_new_healthy; then
+    rollback_new_before_drain
+    return 1
   fi
 
   # Check if pre-stop hook is defined in first old container label
@@ -191,15 +456,33 @@ main() {
   if [ -n "$PRE_STOP_HOOK" ]; then
     echo "==> Running pre-stop hook: $PRE_STOP_HOOK"
 
+    HOOK_PIDS=""
     for OLD_CONTAINER_ID in $OLD_CONTAINER_IDS; do
       # shellcheck disable=SC2086 # DOCKER_ARGS must be unquoted to allow multiple arguments
       docker $DOCKER_ARGS exec "$OLD_CONTAINER_ID" sh -c "$PRE_STOP_HOOK" &
+      HOOK_PIDS="$HOOK_PIDS $!"
     done
 
-    # Wait for all pre-stop hooks to finish
-    wait
+    # POSIX `wait` without individual PIDs may succeed even if one hook failed.
+    HOOK_FAILED=0
+    for HOOK_PID in $HOOK_PIDS; do
+      if ! wait "$HOOK_PID"; then
+        HOOK_FAILED=1
+      fi
+    done
+    if [ "$HOOK_FAILED" -ne 0 ]; then
+      echo "==> Pre-stop hook failed. Keeping both generations for manual recovery." >&2
+      echo "==> Old instances may already be draining; restore them before retrying." >&2
+      return 1
+    fi
   fi
 
+  # A failed new instance after drain requires manual recovery: NEVER stop
+  # the old ones automatically when no working new backend is confirmed.
+  if [ "$HAS_HEALTHCHECK" = "1" ] && ! all_new_healthy; then
+    echo "==> New backend lost health during drain; keeping both generations." >&2
+    return 1
+  fi
   echo "==> Stopping and removing old containers"
 
   # shellcheck disable=SC2086 # DOCKER_ARGS and OLD_CONTAINER_IDS must be unquoted to allow multiple arguments
@@ -246,6 +529,18 @@ while [ $# -gt 0 ]; do
     PRE_STOP_HOOK="$2"
     shift 2
     ;;
+  --pre-drain-url | --pre-drain-header | --pre-drain-probe-network)
+    if [ $# -lt 2 ] || [ -z "$2" ]; then
+      echo "==> $1 requires a value." >&2
+      exit 1
+    fi
+    case "$1" in
+      --pre-drain-url) PRE_DRAIN_URL=$2 ;;
+      --pre-drain-header) PRE_DRAIN_HEADER=$2 ;;
+      --pre-drain-probe-network) PRE_DRAIN_PROBE_NETWORK=$2 ;;
+    esac
+    shift 2
+    ;;
   -v | --version)
     echo "docker-rollout version $VERSION"
     exit 0
@@ -273,6 +568,44 @@ done
 if [ -z "$SERVICE" ]; then
   echo "SERVICE is missing"
   exit_with_usage
+fi
+
+if [ -n "$PRE_DRAIN_URL" ]; then
+  case "$PRE_DRAIN_URL" in
+    http://?* | https://?*) ;;
+    *) echo "==> pre-drain-url must use HTTP or HTTPS." >&2; exit 1 ;;
+  esac
+  case "$PRE_DRAIN_URL" in
+    *[[:space:][:cntrl:]]* | *'#'* | *\\*) echo "==> Invalid pre-drain-url." >&2; exit 1 ;;
+  esac
+  HTTP_AUTHORITY=${PRE_DRAIN_URL#*://}
+  HTTP_AUTHORITY=${HTTP_AUTHORITY%%[/?]*}
+  case "$HTTP_AUTHORITY" in
+    '' | *@* | -*) echo "==> Invalid HTTP authority or userinfo." >&2; exit 1 ;;
+  esac
+  case "$PRE_DRAIN_HEADER" in
+    '' | *[!a-zA-Z0-9-]*) echo "==> Invalid pre-drain-header name." >&2; exit 1 ;;
+  esac
+  PRE_DRAIN_HEADER_LOWER=$(printf '%s' "$PRE_DRAIN_HEADER" | tr '[:upper:]' '[:lower:]')
+  case "$HEALTHCHECK_TIMEOUT" in
+    '' | *[!0-9]*) echo "==> HTTP mode requires an integer timeout >= 7 seconds." >&2; exit 1 ;;
+  esac
+  if [ "$HEALTHCHECK_TIMEOUT" -lt "$((HTTP_STABLE_SECONDS + 2))" ]; then
+    echo "==> HTTP mode requires timeout >= 7 seconds for its 5-second readiness window." >&2
+    exit 1
+  fi
+fi
+
+if [ -n "$PRE_DRAIN_URL" ]; then
+  # Pull before scaling: an unavailable probe image must leave the service intact.
+  # shellcheck disable=SC2086 # Docker global arguments are intentionally split.
+  if ! docker $DOCKER_ARGS image inspect "$HTTP_PROBE_IMAGE" >/dev/null 2>&1; then
+    # shellcheck disable=SC2086 # Docker global arguments are intentionally split.
+    if ! docker $DOCKER_ARGS pull "$HTTP_PROBE_IMAGE"; then
+      echo "==> HTTP probe image is unavailable; service was not changed." >&2
+      exit 1
+    fi
+  fi
 fi
 
 main

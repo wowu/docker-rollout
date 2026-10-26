@@ -6,6 +6,10 @@ A single POSIX `sh` script, [docker-rollout](docker-rollout), installed as a Doc
 
 The whole program is that one file. No build step, no runtime dependency beyond Docker.
 
+The opt-in built-in HTTP gate runs curl inside one digest-pinned temporary Docker
+container. It requires no HTTP client on the host and no permanent component.
+Keep the probe image/network/identity contract documented in `docs/cli-options.md`.
+
 ## Commands
 
 Tasks are wrapped by the [run](run) script; `./run` lists them.

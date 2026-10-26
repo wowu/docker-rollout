@@ -1,0 +1,23 @@
+# HTTP handover fixture: real backends behind an explicitly reloaded nginx proxy.
+services:
+  web:
+    command: busybox httpd -f -p 80 -h /www
+    volumes:
+      - ./http-health.sh:/www/cgi-bin/health:ro
+      - ${HTTP_STATE_DIR}:/state
+    healthcheck:
+      test: test ! -f /tmp/unhealthy
+      interval: 1s
+      timeout: 1s
+      retries: 1
+    labels:
+      docker-rollout.pre-stop-hook: >-
+        for expected in /state/expected-*; do
+          test -s /state/probes-$${expected##*/expected-} || exit 1;
+        done;
+        touch /tmp/drain;
+        date +%s > /state/drained-$$HOSTNAME
+  proxy:
+    image: nginx:alpine
+    volumes:
+      - ${HTTP_PROXY_CONFIG}:/etc/nginx/nginx.conf:ro

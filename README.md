@@ -60,6 +60,22 @@ Options:
 - `-p | --project-name NAME` - (not required) - Project name, as in `docker compose`.
 - `--profile NAME` - (not required) - Specify a profile to enable, as in `docker compose`.
 - `--pre-stop-hook CMD` - (not required) - Command to run in the old container before stopping it. Can be used for marking the container as unhealthy to make proxy stop sending requests to it, see [container draining](#draining-old-containers) below.
+- `--pre-drain-url URL` - (not required) - Enable repeated HTTP 200 verification of every new container for five seconds before drain. The response header must contain the responding container's unique Docker hostname or full ID. Requires a Docker HEALTHCHECK. The plugin runs its HTTP client in a temporary Docker container; no host curl is needed.
+- `--pre-drain-header NAME` - Response header containing the container identity (default `X-Instance`).
+- `--pre-drain-probe-network NAME` - Docker network for the temporary probe (default `bridge`). The URL must be reachable from this network on the selected Docker daemon.
+
+Enable proxy verification with a health-check URL:
+
+```sh
+docker rollout --pre-drain-url https://app.example/health web
+```
+
+The endpoint's header must identify the actual responding container. A static
+release version, an image ID or an aggregate HTTP 200 cannot distinguish the old
+and new containers. Docker already supplies the hostname; the application or
+its HTTP server exposes it in the chosen response header. The plugin does not
+need to know the application or proxy stack. See the [HTTP verification options](docs/cli-options.md)
+for identity, network, image and sampling requirements.
 
 See [detailed options description](https://docker-rollout.wowu.dev/cli-options) and [compose.yml file examples](https://docker-rollout.wowu.dev/examples/) in docs.
 

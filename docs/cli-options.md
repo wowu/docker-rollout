@@ -42,6 +42,9 @@ docker rollout -f docker-compose.yml -f docker-compose.override.yml <service-nam
 
 Timeout in seconds to wait for new container to become healthy, if the container has healthcheck defined.
 
+With HTTP verification, the subsequent proxy-readiness phase receives this same
+timeout separately; it is not one combined deadline for both phases.
+
 Default: 60
 
 **Example**
@@ -141,3 +144,71 @@ docker rollout --pre-stop-hook "touch /tmp/drain && sleep 10" <service-name>
 {: .warning }
 This requires the service to have a healthcheck defined in `docker-compose.yml` or `Dockerfile` that will fail if `/tmp/drain` file exists.
 
+## `--pre-drain-url URL`
+
+```sh
+docker rollout --pre-drain-url https://app.example/health web
+```
+
+Supplying the full health-check URL enables HTTP verification. Without this option,
+HTTP verification is disabled and no probe container is started. The response
+header defaults to `X-Instance`; use `--pre-drain-header` to override it.
+After native Docker HEALTHCHECK succeeds,
+the plugin requires repeated successful HTTP observations for **five seconds**
+before draining old containers. The existing `--timeout` applies separately to
+the Docker-health phase and then the HTTP phase (default 60 seconds). HTTP mode
+requires at least 7 seconds to allow the five-second window and timestamp rounding.
+
+A response counts as new-backend evidence only with HTTP 200 and exactly one named
+header identifying the actual responding container: its unique Docker `Config.Hostname` or full
+64-character Docker ID. A default hostname is normally the short 12-character ID;
+arbitrary ID prefixes, release versions and image IDs are not accepted. Hostnames
+must be unique across both generations. Header names are case-insensitive.
+
+Each fresh sample must observe **every new replica**. A known old response, or an
+HTTP 200 without the selected header, is neutral while collecting them. This
+allows migration from legacy instances that do not expose identity. Headerless
+responses never count toward readiness or replace an unobserved new replica.
+Failed HTTP requests, empty/duplicate/unknown identities and gaps between
+successful samples reset the window. Loss of Docker
+health aborts the rollout. A single successful response never authorizes drain.
+
+Requests use a fresh `rollout_probe` query value, no-cache headers and a new
+connection. The URL must use HTTP/HTTPS without credentials or fragments.
+Redirects are not followed and TLS certificate verification stays enabled.
+
+Only Docker and standard shell utilities are needed on the CLI host. The HTTP
+client runs in one temporary container using `curlimages/curl` pinned to
+`sha256:11e64e28c5f58c8d93ee95fcf22ac055f48b0bc440e0ce7d8013bbb5ad6aa8ac`.
+The plugin checks/pulls this image before scaling. The probe is read-only, has no
+capabilities, host mounts or Docker socket, and uses `no-new-privileges`.
+It is removed before drain and on handled exits; its own maximum lifetime is
+300 seconds if the CLI host disappears. No permanent component is installed.
+
+## `--pre-drain-header NAME`
+
+Response header containing the actual container identity. Default: `X-Instance`.
+Use this option when the endpoint exposes identity under a different header name.
+This option alone does not enable HTTP verification.
+
+## `--pre-drain-probe-network NAME`
+
+Optional Docker network for the temporary HTTP client; default `bridge`. The URL
+is contacted from the selected Docker daemon's probe network, also with remote
+Docker contexts. `localhost` means the probe container. Select an existing
+reachable network, or `host` where supported. The plugin does not create or
+modify application/proxy networks or copy host credentials, proxy variables or CA files.
+
+## Failure semantics and limits
+
+Before drain, failed readiness attempts stop/remove only new containers and
+preserve the old generation. Cleanup failures are reported. If an old pre-stop
+hook fails or new Docker health is lost after drain begins, both generations
+remain for operator recovery; retaining an old container does not undo drain.
+
+These are sampled observations, not continuous monitoring or a guarantee of
+future proxy behavior. Curl requests are bounded to one second; collection and
+window timing round up to whole-second timestamps. Docker inspect/run/exec calls
+are not watchdog-bounded, so `--timeout` is approximate. The initial bootstrap
+keeps the existing Compose start path after option/image preflight, without an
+HTTP gate.
