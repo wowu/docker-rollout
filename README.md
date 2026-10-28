@@ -18,6 +18,7 @@ Simply replace `docker compose up -d <service>` with `docker rollout <service>` 
   - [⚠️ Caveats](#️-caveats)
   - [Sample deployment script](#sample-deployment-script)
   - [Draining old containers](#draining-old-containers)
+- [Community integrations](#community-integrations)
 - [Why?](#why)
 - [License](#license)
 
@@ -148,6 +149,10 @@ Using container orchestration tools like [Kubernetes](https://kubernetes.io/) or
 If you have a proxy like [Traefik](https://github.com/traefik/traefik) or [nginx-proxy](https://github.com/nginx-proxy/nginx-proxy), a zero downtime deployment can be achieved by writing a script that scales the service to 2 instances, waits for the new container to be ready, and then removes the old container.
 `docker rollout` does exactly that, but with a single command that you can use in your deployment scripts.
 If you're using Docker healthchecks, Traefik will make sure that traffic is only routed to the new container when it's ready.
+
+## Community integrations
+
+- [mtizima/docker-rollout-action](https://github.com/mtizima/docker-rollout-action) - GitHub Action for deploying Docker Compose services over SSH using docker-rollout.
 
 ## License
 
