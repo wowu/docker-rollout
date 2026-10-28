@@ -68,9 +68,13 @@ docker rollout --wait 30 <service-name>
 
 ## `--wait-after-healthy SECONDS`
 
-Time to wait after new container is healthy before removing old container. Works when a healthcheck is defined. Can be useful if the service healthcheck is not reliable and the service needs some time to stabilize (see [#27](https://github.com/wowu/docker-rollout/issues/27)).
+Time to wait after new container is healthy before removing old container. Works when a healthcheck is defined.
 
-Default: 0
+The default gives the reverse proxy time to start routing traffic to the new container before the old one is stopped. Traefik, for example, picks up a new container only after its `healthy` event and throttles configuration reloads ([`providers.providersThrottleDuration`](https://doc.traefik.io/traefik/reference/install-configuration/providers/docker/#opt-providers-providersThrottleDuration), 2 seconds by default). Without this delay, the old container could be removed before the proxy knows about the new one, briefly leaving it with no backend. Increase it if the service healthcheck is not reliable and the service needs some time to stabilize (see [#27](https://github.com/wowu/docker-rollout/issues/27)), or set it to `0` to disable the delay.
+
+This delay doesn't drain requests from the old container. To avoid errors while the old container is stopping, see [container draining](container-draining).
+
+Default: 3
 
 **Example**
 
