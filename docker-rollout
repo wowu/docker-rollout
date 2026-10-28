@@ -6,7 +6,7 @@ VERSION=v0.14
 # Defaults
 HEALTHCHECK_TIMEOUT=60
 NO_HEALTHCHECK_TIMEOUT=10
-WAIT_AFTER_HEALTHY_DELAY=0
+WAIT_AFTER_HEALTHY_DELAY=3
 
 # Print metadata for Docker CLI plugin
 if [ "$1" = "docker-cli-plugin-metadata" ]; then
@@ -57,7 +57,7 @@ Options:
   -w, --wait N                When no healthcheck is defined, wait for N seconds
                               before stopping old container (default: $NO_HEALTHCHECK_TIMEOUT seconds)
       --wait-after-healthy N  When healthcheck is defined and succeeds, wait for additional N seconds
-                              before stopping the old container (default: 0 seconds)
+                              before stopping the old container (default: $WAIT_AFTER_HEALTHY_DELAY seconds)
       --env-file FILE         Specify an alternate environment file
   -p, --project-name NAME     Specify an alternate project name
       --profile NAME          Specify an alternate profile to use

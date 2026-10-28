@@ -69,7 +69,7 @@ assert_none_running() {
   local old_id
   old_id="$(container_ids)"
 
-  run "$ROLLOUT" rollout -f "$BASE" -f "$HEALTHY" -t 30 web
+  run "$ROLLOUT" rollout -f "$BASE" -f "$HEALTHY" -t 30 --wait-after-healthy 0 web
   [ "$status" -eq 0 ] || fail "rollout failed ($status): $output"
 
   [ "$(running_count)" -eq 1 ] || fail "expected 1 running container, got $(running_count)"
@@ -117,7 +117,7 @@ assert_none_running() {
   old_ids="$(container_ids)"
   [ "$(running_count)" -eq 2 ] || fail "fixture setup expected 2 containers, got $(running_count)"
 
-  run "$ROLLOUT" rollout -f "$BASE" -f "$HEALTHY" -t 30 web
+  run "$ROLLOUT" rollout -f "$BASE" -f "$HEALTHY" -t 30 --wait-after-healthy 0 web
   [ "$status" -eq 0 ] || fail "rollout failed ($status): $output"
 
   # Back down to 2, and neither original container remains.
